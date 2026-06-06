@@ -1,3 +1,5 @@
+"use client";
+
 import { MessageSquare, Github, Settings } from "lucide-react";
 
 const items = [

@@ -1,3 +1,5 @@
+"use client";
+
 import { Sparkles } from "lucide-react";
 
 export function EmptyState() {

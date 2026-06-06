@@ -1,3 +1,5 @@
+"use client";
+
 import { X, MessageSquare, Github, Settings } from "lucide-react";
 
 interface MobileSidebarProps {

@@ -1,3 +1,5 @@
+"use client";
+
 import { SendHorizonal } from "lucide-react";
 
 export function MessageInput() {
