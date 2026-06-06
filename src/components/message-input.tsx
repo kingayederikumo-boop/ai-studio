@@ -1,23 +1,53 @@
 "use client";
 
-import { Icon } from "./sidebar";
+import React, { useState } from "react";
+import { useChat } from "@/src/state/chat-context";
 
 export function MessageInput() {
-  return (
-    <div className="border-t border-zinc-800 bg-zinc-950">
-      <div className="mx-auto max-w-4xl p-4">
-        <div className="flex items-end gap-3 rounded-2xl border border-zinc-800 bg-zinc-900 p-3">
-          <textarea
-            placeholder="Message AI Studio..."
-            rows={1}
-            className="max-h-40 min-h-[24px] flex-1 resize-none bg-transparent text-sm outline-none placeholder:text-zinc-500"
-          />
+  const { sendMessage } = useChat();
+  const [text, setText] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-          <button className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-black transition hover:opacity-90">
-            <Icon name="SendHorizonal" size={18} />
-          </button>
-        </div>
-      </div>
-    </div>
+  async function onSend() {
+    if (!text.trim()) return;
+    setSubmitting(true);
+    try {
+      await sendMessage(text);
+      setText("");
+    } catch (e) {
+      // noop
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      void onSend();
+    }
+  }
+
+  return (
+    <>
+      <textarea
+        placeholder="Message AI Studio..."
+        rows={1}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={onKeyDown}
+        className="max-h-40 min-h-[24px] flex-1 resize-none bg-transparent text-sm outline-none placeholder:text-zinc-500"
+      />
+
+      <button
+        onClick={onSend}
+        disabled={submitting}
+        className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-black transition hover:opacity-90"
+      >
+        Send
+      </button>
+    </>
   );
 }
+
+export default MessageInput;
