@@ -1,5 +1,5 @@
-import { Sidebar } from "@/components/sidebar";
-import { ChatLayout } from "@/components/chat-layout";
+import { Sidebar } from "@/src/components/sidebar";
+import { ChatLayout } from "@/src/components/chat-layout";
 
 export default function HomePage() {
   return (
