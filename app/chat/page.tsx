@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import ChatLayout from "@/src/components/chat-layout";
+import { ChatLayout } from "@/src/components/chat-layout";
 import MessageInput from "@/src/components/message-input";
 
 export default function ChatPage() {

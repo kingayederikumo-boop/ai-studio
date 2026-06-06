@@ -2,7 +2,6 @@
 
 import React, { createContext, useContext, useRef, useState } from "react";
 import { Message } from "@/src/types";
-import { v4 as uuid } from "uuid";
 
 type ChatContextType = {
   messages: Message[];
@@ -12,6 +11,19 @@ type ChatContextType = {
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
+function generateId(): string {
+  try {
+    // @ts-ignore
+    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+      // @ts-ignore
+      return crypto.randomUUID();
+    }
+  } catch (e) {
+    // ignore
+  }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+}
+
 export function ChatProvider({ children }: { children: React.ReactNode }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const loadingRef = useRef(false);
@@ -20,7 +32,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     if (!content.trim()) throw new Error("empty");
 
     const message: Message = {
-      id: uuid(),
+      id: generateId(),
       role: "user",
       content: content.trim(),
       createdAt: new Date().toISOString(),
@@ -33,7 +45,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       loadingRef.current = true;
       await new Promise((r) => setTimeout(r, 300));
       const assistant: Message = {
-        id: uuid(),
+        id: generateId(),
         role: "assistant",
         content: "(This is a placeholder assistant response)",
         createdAt: new Date().toISOString(),

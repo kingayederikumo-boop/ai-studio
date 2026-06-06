@@ -1,7 +1,8 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { Settings, SettingsService } from "@/src/services/settingsService";
+import type { Settings } from "@/src/types";
+import { SettingsService } from "@/src/services/settingsService";
 
 type SettingsContextType = {
   settings: Settings;
