@@ -1,13 +1,13 @@
 "use client";
 
-import { Sparkles } from "lucide-react";
+import { Icon } from "./sidebar";
 
 export function EmptyState() {
   return (
     <div className="flex h-full items-center justify-center px-6">
       <div className="max-w-md text-center">
         <div className="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-zinc-800">
-          <Sparkles size={24} />
+          <Icon name="Sparkles" size={24} />
         </div>
 
         <h2 className="mb-2 text-2xl font-semibold">
