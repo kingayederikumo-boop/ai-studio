@@ -1,8 +1,13 @@
-export default function Home() {
+import { Sidebar } from "@/components/sidebar";
+import { ChatLayout } from "@/components/chat-layout";
+
+export default function HomePage() {
   return (
-    <main>
-      <h1>AI Studio</h1>
-      <p>Unified AI Workspace</p>
-    </main>
+    <div className="h-screen bg-zinc-950 text-zinc-100">
+      <div className="flex h-full">
+        <Sidebar />
+        <ChatLayout />
+      </div>
+    </div>
   );
 }
