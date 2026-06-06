@@ -1,6 +1,6 @@
 "use client";
 
-import { SendHorizonal } from "lucide-react";
+import { Icon } from "./sidebar";
 
 export function MessageInput() {
   return (
@@ -14,7 +14,7 @@ export function MessageInput() {
           />
 
           <button className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-black transition hover:opacity-90">
-            <SendHorizonal size={18} />
+            <Icon name="SendHorizonal" size={18} />
           </button>
         </div>
       </div>
