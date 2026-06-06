@@ -1,6 +1,6 @@
 "use client";
 
-import { X, MessageSquare, Github, Settings } from "lucide-react";
+import { Icon } from "./sidebar";
 
 interface MobileSidebarProps {
   open: boolean;
@@ -28,23 +28,23 @@ export function MobileSidebar({
             onClick={onClose}
             className="rounded-lg p-2 hover:bg-zinc-800"
           >
-            <X size={18} />
+            <Icon name="X" size={18} />
           </button>
         </div>
 
         <nav className="p-4 space-y-2">
           <button className="flex w-full items-center gap-3 rounded-xl bg-zinc-800 px-4 py-3">
-            <MessageSquare size={18} />
+            <Icon name="MessageSquare" size={18} />
             Chat
           </button>
 
           <button className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-zinc-400 hover:bg-zinc-800">
-            <Github size={18} />
+            <Icon name="Github" size={18} />
             GitHub
           </button>
 
           <button className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-zinc-400 hover:bg-zinc-800">
-            <Settings size={18} />
+            <Icon name="Settings" size={18} />
             Settings
           </button>
         </nav>
