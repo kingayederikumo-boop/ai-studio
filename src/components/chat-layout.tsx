@@ -3,8 +3,9 @@
 import React, { useEffect, useRef } from "react";
 import { useChat } from "@/src/state/chat-context";
 import { Icon } from "./sidebar-icons";
+import MessageInput from "./message-input";
 
-export function ChatLayout() {
+export default function ChatLayout() {
   const { messages } = useChat();
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
@@ -48,9 +49,7 @@ export function ChatLayout() {
       <div className="border-t border-zinc-800 bg-zinc-950">
         <div className="mx-auto max-w-4xl p-4">
           <div className="flex items-end gap-3 rounded-2xl border border-zinc-800 bg-zinc-900 p-3">
-            {/* MessageInput will be replaced by the input component */}
-            {/* Keep a client-side input here for simplicity */}
-            <div id="message-input-placeholder"></div>
+            <MessageInput />
           </div>
         </div>
       </div>
