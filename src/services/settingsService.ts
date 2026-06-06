@@ -1,24 +1,24 @@
+import type { Settings as SettingsType } from "@/src/types";
+
 export const SettingsService = {
   key: "ai-studio:settings",
-  save(settings: any) {
+  save(settings: SettingsType): void {
+    if (typeof window === "undefined") return;
     try {
       localStorage.setItem(this.key, JSON.stringify(settings));
-    } catch (e) {
+    } catch {
       // noop
     }
   },
-  load() {
+
+  load(): SettingsType | null {
+    if (typeof window === "undefined") return null;
     try {
       const raw = localStorage.getItem(this.key);
       if (!raw) return null;
-      return JSON.parse(raw);
-    } catch (e) {
+      return JSON.parse(raw) as SettingsType;
+    } catch {
       return null;
     }
   },
-};
-
-export type Settings = {
-  architectureProvider: "OpenAI" | "Nvidia";
-  codingProvider: "OpenAI" | "Nvidia";
 };
