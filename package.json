@@ -8,15 +8,18 @@
     "start": "next start",
     "lint": "eslint"
   },
+  "engines": {
+    "node": "18.x"
+  },
   "dependencies": {
     "next": "16.2.4",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "tailwindcss": "^3.4.8",
+    "postcss": "^8.4.21",
+    "autoprefixer": "^10.4.14"
   },
   "devDependencies": {
-    "autoprefixer": "^10.4.14",
-    "postcss": "^8.4.21",
-    "tailwindcss": "^3.4.8",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
