@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { GitHubRepository } from "@/src/types";
+import type { GitHubRepository } from "@/src/types/index";
 
 export function RepositoryCard({ repo }: { repo: GitHubRepository }) {
   return (
