@@ -1,42 +1,34 @@
-import type { Settings as SettingsType } from "@/src/types";
+import type { Settings } from "@/src/types";
 
-const STORAGE_KEY = "ai-studio:settings";
+const STORAGE_KEY = "ai-studio-settings";
 
-export const SettingsService = {
-  save(settings: SettingsType): void {
-    if (typeof window === "undefined") return;
+export class SettingsService {
+  static load(): Settings | null {
     try {
+      if (typeof window === "undefined") return null;
+      const stored = localStorage.getItem(STORAGE_KEY);
+      return stored ? JSON.parse(stored) : null;
+    } catch (e) {
+      console.error("Failed to load settings:", e);
+      return null;
+    }
+  }
+
+  static save(settings: Settings): void {
+    try {
+      if (typeof window === "undefined") return;
       localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-    } catch {
-      // noop
+    } catch (e) {
+      console.error("Failed to save settings:", e);
     }
-  },
+  }
 
-  load(): SettingsType | null {
-    if (typeof window === "undefined") return null;
+  static clear(): void {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return null;
-      const parsed = JSON.parse(raw);
-      if (
-        parsed &&
-        (parsed.architectureProvider === "OpenAI" || parsed.architectureProvider === "Nvidia") &&
-        (parsed.codingProvider === "OpenAI" || parsed.codingProvider === "Nvidia")
-      ) {
-        return parsed as SettingsType;
-      }
-      return null;
-    } catch {
-      return null;
-    }
-  },
-
-  clear(): void {
-    if (typeof window === "undefined") return;
-    try {
+      if (typeof window === "undefined") return;
       localStorage.removeItem(STORAGE_KEY);
-    } catch {
-      // noop
+    } catch (e) {
+      console.error("Failed to clear settings:", e);
     }
-  },
-};
+  }
+}

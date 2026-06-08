@@ -1,35 +1,11 @@
-export type Message = {
+export interface Message {
   id: string;
-  role: "user" | "assistant" | "system";
+  role: "user" | "assistant";
   content: string;
   createdAt: string;
-};
+}
 
-export type ProviderName = "OpenAI" | "Nvidia";
-
-export type Settings = {
-  architectureProvider: ProviderName;
-  codingProvider: ProviderName;
-};
-
-export type GitHubRepository = {
-  id: string;
-  name: string;
-  fullName: string;
-  description?: string;
-  private: boolean;
-};
-
-export type GitHubFile = {
-  path: string;
-  name: string;
-  type: "file" | "dir";
-  size?: number;
-};
-
-export type GitHubCommit = {
-  sha: string;
-  message: string;
-  author?: string;
-  date: string;
-};
+export interface Settings {
+  architectureProvider: string;
+  codingProvider: string;
+}
