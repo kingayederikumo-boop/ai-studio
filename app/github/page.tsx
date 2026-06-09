@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { GitHubService } from "@/src/services/githubService";
 import { RepositoryCard } from "@/src/components/github/repository-card";
-import type { GitHubRepository } from "@/src/types/index";
+import type { GitHubRepository } from "@/src/types";
 
 export default function GitHubPage() {
   const [loading, setLoading] = useState<boolean>(true);
