@@ -1,38 +1,237 @@
-import type { GitHubRepository, GitHubFile, GitHubCommit } from "@/src/types";
+import axios, { AxiosError } from "axios";
+import type {
+  GitHubRepository,
+  GitHubFile,
+  GitHubCommit,
+} from "@/src/types/index";
 
-export type GitHubResponse<T = unknown> = { ok: boolean; payload?: T; error?: string };
+export type GitHubResponse<T = unknown> = {
+  ok: boolean;
+  payload?: T;
+  error?: string;
+};
 
 // GitHub API Keys from environment
 const GITHUB_TOKEN_CLASSIC = process.env.GITHUB_TOKEN_CLASSIC;
 const GITHUB_TOKEN_FINE_GRAINED = process.env.GITHUB_TOKEN_FINE_GRAINED;
 
+const GITHUB_API_BASE = "https://api.github.com";
+
+function getAuthToken(): string | null {
+  return GITHUB_TOKEN_CLASSIC || GITHUB_TOKEN_FINE_GRAINED || null;
+}
+
+function getHeaders(): Record<string, string> {
+  const token = getAuthToken();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    Accept: "application/vnd.github.v3+json",
+  };
+
+  if (token) {
+    headers.Authorization = `token ${token}`;
+  }
+
+  return headers;
+}
+
+async function makeRequest<T>(
+  url: string
+): Promise<{ ok: boolean; data?: T; error?: string }> {
+  try {
+    const response = await axios.get<T>(url, {
+      headers: getHeaders(),
+      timeout: 30000,
+    });
+    return { ok: true, data: response.data };
+  } catch (error) {
+    const errorMessage =
+      error instanceof AxiosError
+        ? error.response?.data?.message ||
+          error.message ||
+          "Unknown error"
+        : error instanceof Error
+          ? error.message
+          : String(error);
+    return { ok: false, error: `GitHub API error: ${errorMessage}` };
+  }
+}
+
 export const GitHubService = {
-  async listRepositories(): Promise<GitHubResponse<GitHubRepository[]>> {
-    if (!GITHUB_TOKEN_CLASSIC && !GITHUB_TOKEN_FINE_GRAINED) {
-      return { ok: false, error: "GitHub API token not configured", payload: [] };
+  async listRepositories(): Promise<
+    GitHubResponse<GitHubRepository[]>
+  > {
+    const token = getAuthToken();
+    if (!token) {
+      return {
+        ok: false,
+        error: "GitHub API token not configured",
+        payload: [],
+      };
     }
-    // Placeholder — replace with actual API call
-    return Promise.resolve({ ok: true, payload: [] });
+
+    const result = await makeRequest<
+      Array<{
+        id: number;
+        name: string;
+        full_name: string;
+        description: string | null;
+        private: boolean;
+      }>
+    >(`${GITHUB_API_BASE}/user/repos?per_page=100`);
+
+    if (!result.ok) {
+      return {
+        ok: false,
+        error: result.error,
+        payload: [],
+      };
+    }
+
+    const repos: GitHubRepository[] = (result.data || []).map((r) => ({
+      id: String(r.id),
+      name: r.name,
+      fullName: r.full_name,
+      description: r.description || undefined,
+      private: r.private,
+    }));
+
+    return { ok: true, payload: repos };
   },
 
-  async getRepositoryDetails(id: string): Promise<GitHubResponse<GitHubRepository | null>> {
-    if (!GITHUB_TOKEN_CLASSIC && !GITHUB_TOKEN_FINE_GRAINED) {
-      return { ok: false, error: "GitHub API token not configured", payload: null };
+  async getRepositoryDetails(
+    owner: string,
+    repo: string
+  ): Promise<GitHubResponse<GitHubRepository | null>> {
+    const token = getAuthToken();
+    if (!token) {
+      return {
+        ok: false,
+        error: "GitHub API token not configured",
+        payload: null,
+      };
     }
-    return Promise.resolve({ ok: true, payload: null });
+
+    const result = await makeRequest<{
+      id: number;
+      name: string;
+      full_name: string;
+      description: string | null;
+      private: boolean;
+    }>(`${GITHUB_API_BASE}/repos/${owner}/${repo}`);
+
+    if (!result.ok) {
+      return {
+        ok: false,
+        error: result.error,
+        payload: null,
+      };
+    }
+
+    if (!result.data) {
+      return {
+        ok: false,
+        error: "Repository not found",
+        payload: null,
+      };
+    }
+
+    const repo_data: GitHubRepository = {
+      id: String(result.data.id),
+      name: result.data.name,
+      fullName: result.data.full_name,
+      description: result.data.description || undefined,
+      private: result.data.private,
+    };
+
+    return { ok: true, payload: repo_data };
   },
 
-  async listFiles(repoId: string, path = "/"): Promise<GitHubResponse<GitHubFile[]>> {
-    if (!GITHUB_TOKEN_CLASSIC && !GITHUB_TOKEN_FINE_GRAINED) {
-      return { ok: false, error: "GitHub API token not configured", payload: [] };
+  async listFiles(
+    owner: string,
+    repo: string,
+    path = ""
+  ): Promise<GitHubResponse<GitHubFile[]>> {
+    const token = getAuthToken();
+    if (!token) {
+      return {
+        ok: false,
+        error: "GitHub API token not configured",
+        payload: [],
+      };
     }
-    return Promise.resolve({ ok: true, payload: [] });
+
+    const filePath = path ? `/${path}` : "";
+    const result = await makeRequest<
+      Array<{
+        name: string;
+        path: string;
+        type: "file" | "dir";
+        size?: number;
+      }>
+    >(`${GITHUB_API_BASE}/repos/${owner}/${repo}/contents${filePath}`);
+
+    if (!result.ok) {
+      return {
+        ok: false,
+        error: result.error,
+        payload: [],
+      };
+    }
+
+    const files: GitHubFile[] = (result.data || []).map((f) => ({
+      path: f.path,
+      name: f.name,
+      type: f.type,
+      size: f.size,
+    }));
+
+    return { ok: true, payload: files };
   },
 
-  async listCommits(repoId: string): Promise<GitHubResponse<GitHubCommit[]>> {
-    if (!GITHUB_TOKEN_CLASSIC && !GITHUB_TOKEN_FINE_GRAINED) {
-      return { ok: false, error: "GitHub API token not configured", payload: [] };
+  async listCommits(
+    owner: string,
+    repo: string
+  ): Promise<GitHubResponse<GitHubCommit[]>> {
+    const token = getAuthToken();
+    if (!token) {
+      return {
+        ok: false,
+        error: "GitHub API token not configured",
+        payload: [],
+      };
     }
-    return Promise.resolve({ ok: true, payload: [] });
+
+    const result = await makeRequest<
+      Array<{
+        sha: string;
+        commit: {
+          message: string;
+          author?: {
+            name: string;
+            date: string;
+          };
+        };
+      }>
+    >(
+      `${GITHUB_API_BASE}/repos/${owner}/${repo}/commits?per_page=100`
+    );
+
+    if (!result.ok) {
+      return {
+        ok: false,
+        error: result.error,
+        payload: [],
+      };
+    }
+
+    const commits: GitHubCommit[] = (result.data || []).map((c) => ({
+      sha: c.sha,
+      message: c.commit.message,
+      author: c.commit.author?.name,
+      date: c.commit.author?.date || new Date().toISOString(),
+    }));
+
+    return { ok: true, payload: commits };
   },
 };

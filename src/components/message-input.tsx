@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { useChat } from "@/src/state/chat-context";
 
 export function MessageInput() {
-  const { sendMessage } = useChat();
+  const { sendMessage, loading } = useChat();
   const [text, setText] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -15,7 +15,7 @@ export function MessageInput() {
       await sendMessage(text);
       setText("");
     } catch (e) {
-      // noop
+      // error handled in context
     } finally {
       setSubmitting(false);
     }
@@ -29,22 +29,23 @@ export function MessageInput() {
   }
 
   return (
-    <div className="flex items-end gap-3 rounded-xl border border-zinc-800 bg-zinc-900 p-3">
+    <div className="flex items-end gap-3 rounded-xl border border-zinc-800 bg-zinc-900 p-4">
       <textarea
         placeholder="Message AI Studio..."
-        rows={1}
+        rows={4}
         value={text}
         onChange={(e) => setText(e.target.value)}
         onKeyDown={onKeyDown}
-        className="max-h-40 min-h-[24px] flex-1 resize-none bg-transparent text-sm outline-none placeholder:text-zinc-500"
+        disabled={loading}
+        className="max-h-64 min-h-[100px] flex-1 resize-none bg-transparent text-sm outline-none placeholder:text-zinc-500 disabled:opacity-50"
       />
 
       <button
         onClick={onSend}
-        disabled={submitting || !text.trim()}
-        className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-white text-black transition hover:opacity-90 disabled:opacity-50"
+        disabled={submitting || !text.trim() || loading}
+        className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-lg bg-white text-black transition hover:opacity-90 disabled:opacity-50"
       >
-        {submitting ? "..." : "Send"}
+        {submitting || loading ? "..." : "Send"}
       </button>
     </div>
   );

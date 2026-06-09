@@ -1,12 +1,16 @@
 "use client";
 
-import React, { createContext, useContext, useRef, useState } from "react";
-import { Message } from "@/src/types";
+import React, { createContext, useContext, useState } from "react";
+import { Message } from "@/src/types/index";
+import { useSettings } from "./settings-context";
+import { ProviderRouter } from "@/src/services/providerRouter";
 
 type ChatContextType = {
   messages: Message[];
   sendMessage: (content: string) => Promise<Message>;
   clearMessages: () => void;
+  loading: boolean;
+  error?: string;
 };
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
@@ -26,43 +30,70 @@ function generateId(): string {
 
 export function ChatProvider({ children }: { children: React.ReactNode }) {
   const [messages, setMessages] = useState<Message[]>([]);
-  const loadingRef = useRef(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string>();
+  const { settings } = useSettings();
 
   async function sendMessage(content: string) {
     if (!content.trim()) throw new Error("empty");
 
-    const message: Message = {
+    const userMessage: Message = {
       id: generateId(),
       role: "user",
       content: content.trim(),
       createdAt: new Date().toISOString(),
     };
 
-    setMessages((m) => [...m, message]);
+    setMessages((m) => [...m, userMessage]);
+    setLoading(true);
+    setError(undefined);
 
-    // Placeholder assistant response (simulate async)
-    if (!loadingRef.current) {
-      loadingRef.current = true;
-      await new Promise((r) => setTimeout(r, 300));
-      const assistant: Message = {
+    try {
+      const provider = ProviderRouter.selectArchitecture(settings);
+      const response = await ProviderRouter.generateText(content, provider);
+
+      if (!response.ok) {
+        setError(response.error);
+        const errorMessage: Message = {
+          id: generateId(),
+          role: "assistant",
+          content: `Error: ${response.error}`,
+          createdAt: new Date().toISOString(),
+        };
+        setMessages((m) => [...m, errorMessage]);
+      } else {
+        const assistantMessage: Message = {
+          id: generateId(),
+          role: "assistant",
+          content: response.text || "No response received",
+          createdAt: new Date().toISOString(),
+        };
+        setMessages((m) => [...m, assistantMessage]);
+      }
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      setError(errorMsg);
+      const errorMessage: Message = {
         id: generateId(),
         role: "assistant",
-        content: "(This is a placeholder assistant response)",
+        content: `Error: ${errorMsg}`,
         createdAt: new Date().toISOString(),
       };
-      setMessages((m) => [...m, assistant]);
-      loadingRef.current = false;
+      setMessages((m) => [...m, errorMessage]);
+    } finally {
+      setLoading(false);
     }
 
-    return message;
+    return userMessage;
   }
 
   function clearMessages() {
     setMessages([]);
+    setError(undefined);
   }
 
   return (
-    <ChatContext.Provider value={{ messages, sendMessage, clearMessages }}>
+    <ChatContext.Provider value={{ messages, sendMessage, clearMessages, loading, error }}>
       {children}
     </ChatContext.Provider>
   );
