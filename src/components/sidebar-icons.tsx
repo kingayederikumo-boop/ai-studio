@@ -2,7 +2,7 @@
 
 import React from "react";
 
-type IconName =
+export type IconName =
   | "MessageSquare"
   | "Github"
   | "Settings"
