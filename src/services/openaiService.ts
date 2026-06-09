@@ -11,6 +11,9 @@ export interface OpenAIGenerateTextPayload {
 }
 
 const API_KEY = process.env.OPENAI_API_KEY;
+// Model can be provided via env. If not provided, we'll try a prioritized list.
+const ENV_MODEL = process.env.OPENAI_MODEL;
+const DEFAULT_MODEL_CANDIDATES = ["gpt-4o", "gpt-4o-mini", "gpt-3.5-turbo"];
 
 let openaiClient: OpenAI | null = null;
 
@@ -25,11 +28,9 @@ function getClient(): OpenAI {
 }
 
 function extractTextFromChatResponse(response: any): string | null {
-  // Try to handle various SDK response shapes
   try {
     const choice = response?.choices?.[0];
     if (!choice) return null;
-    // Newer SDK: choice.message.content may be string or array
     const msg = choice.message;
     if (typeof msg === "string") return msg;
     if (msg) {
@@ -40,12 +41,16 @@ function extractTextFromChatResponse(response: any): string | null {
         return part?.text ?? null;
       }
     }
-    // Older fallback
     if (typeof choice.text === "string") return choice.text;
   } catch (e) {
     // ignore
   }
   return null;
+}
+
+function isModelNotFoundError(err: any): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /does not exist|model not found|404/.test(msg.toLowerCase());
 }
 
 export const OpenAIService = {
@@ -56,31 +61,44 @@ export const OpenAIService = {
       return { ok: false, error: "OpenAI API key not configured" };
     }
 
-    try {
-      const client = getClient();
+    const client = getClient();
+    const modelsToTry = ENV_MODEL ? [ENV_MODEL, ...DEFAULT_MODEL_CANDIDATES] : DEFAULT_MODEL_CANDIDATES;
 
-      // Use the official SDK chat completions API
-      const response = await client.chat.completions.create({
-        model: "gpt-4-turbo",
-        messages: [
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
-        max_tokens: 1024,
-        temperature: 0.7,
-      });
+    let lastError: string | null = null;
 
-      const text = extractTextFromChatResponse(response as any);
-      if (!text) {
-        return { ok: false, error: "Unable to parse OpenAI response" };
+    for (const model of modelsToTry) {
+      try {
+        const response = await (client as any).chat.completions.create({
+          model,
+          messages: [
+            {
+              role: "user",
+              content: prompt,
+            },
+          ],
+          max_tokens: 1024,
+          temperature: 0.7,
+        });
+
+        const text = extractTextFromChatResponse(response as any);
+        if (!text) {
+          lastError = "Unable to parse OpenAI response";
+          continue;
+        }
+
+        return { ok: true, payload: { text } };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        lastError = message;
+        // If model-specific error (not found / no access), try the next model
+        if (isModelNotFoundError(err)) {
+          continue;
+        }
+        // For other errors return immediately
+        return { ok: false, error: `OpenAI API error: ${message}` };
       }
-
-      return { ok: true, payload: { text } };
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      return { ok: false, error: `OpenAI API error: ${errorMessage}` };
     }
+
+    return { ok: false, error: `OpenAI API error after trying models: ${lastError}` };
   },
 };
