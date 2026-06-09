@@ -23,11 +23,12 @@ const INFERENCE_MODEL = "meta/llama-2-70b-chat";
 
 interface NvidiaKeyRotation {
   currentIndex: number;
-  lastError?: string;
+  lastError?: string | null;
 }
 
 const keyRotation: NvidiaKeyRotation = {
   currentIndex: 0,
+  lastError: null,
 };
 
 function getCurrentKey(): string | null {
@@ -102,8 +103,8 @@ async function inferenceWithRetry(
             error.message ||
             "Unknown error"
           : error instanceof Error
-            ? error.message
-            : String(error);
+          ? error.message
+          : String(error);
 
       keyRotation.lastError = lastError;
 
