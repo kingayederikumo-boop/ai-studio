@@ -4,8 +4,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import React from "react";
 import { Icon } from "./sidebar-icons";
+import type { IconName } from "./sidebar-icons";
 
-const items = [
+const items: Array<{ name: string; href: string; icon: IconName }> = [
   { name: "Chat", href: "/chat", icon: "MessageSquare" },
   { name: "GitHub", href: "/github", icon: "Github" },
   { name: "Settings", href: "/settings", icon: "Settings" },
