@@ -29,7 +29,7 @@ export function MessageInput() {
   }
 
   return (
-    <>
+    <div className="flex items-end gap-3 rounded-xl border border-zinc-800 bg-zinc-900 p-3">
       <textarea
         placeholder="Message AI Studio..."
         rows={1}
@@ -41,12 +41,12 @@ export function MessageInput() {
 
       <button
         onClick={onSend}
-        disabled={submitting}
-        className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-black transition hover:opacity-90"
+        disabled={submitting || !text.trim()}
+        className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-white text-black transition hover:opacity-90 disabled:opacity-50"
       >
-        Send
+        {submitting ? "..." : "Send"}
       </button>
-    </>
+    </div>
   );
 }
 
