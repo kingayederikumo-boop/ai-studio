@@ -18,8 +18,13 @@ const NVIDIA_API_KEYS = [
   process.env.NVIDIA_API_KEY_4,
 ].filter(Boolean) as string[];
 
+// Models can be provided as a comma-separated env var. If a list is provided and matches the number of keys,
+// each key will be used with the model at the corresponding index. Otherwise, a single default model is used for all keys.
+const NVIDIA_MODELS_ENV = process.env.NVIDIA_MODELS || "";
+const NVIDIA_MODELS = NVIDIA_MODELS_ENV.split(",").map((s) => s.trim()).filter(Boolean);
+const DEFAULT_INFERENCE_MODEL = process.env.NVIDIA_INFERENCE_MODEL || "meta/llama-2-70b-chat";
+
 const NVIDIA_API_BASE = "https://integrate.api.nvidia.com/v1";
-const INFERENCE_MODEL = "meta/llama-2-70b-chat";
 
 interface NvidiaKeyRotation {
   currentIndex: number;
@@ -36,11 +41,24 @@ function getCurrentKey(): string | null {
   return NVIDIA_API_KEYS[keyRotation.currentIndex];
 }
 
+function getModelForCurrentKey(): string {
+  if (NVIDIA_MODELS.length === 0) return DEFAULT_INFERENCE_MODEL;
+  // If models array length matches keys, map by index; otherwise use first model for all keys
+  if (NVIDIA_MODELS.length === NVIDIA_API_KEYS.length) {
+    return NVIDIA_MODELS[keyRotation.currentIndex] || DEFAULT_INFERENCE_MODEL;
+  }
+  return NVIDIA_MODELS[0] || DEFAULT_INFERENCE_MODEL;
+}
+
 function rotateToNextKey(): string | null {
   if (NVIDIA_API_KEYS.length === 0) return null;
-  keyRotation.currentIndex =
-    (keyRotation.currentIndex + 1) % NVIDIA_API_KEYS.length;
+  keyRotation.currentIndex = (keyRotation.currentIndex + 1) % NVIDIA_API_KEYS.length;
   return NVIDIA_API_KEYS[keyRotation.currentIndex];
+}
+
+function isModelNotFoundError(err: any): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /model not found|does not exist|404/.test(msg.toLowerCase());
 }
 
 async function inferenceWithRetry(
@@ -62,11 +80,13 @@ async function inferenceWithRetry(
       };
     }
 
+    const model = getModelForCurrentKey();
+
     try {
       const response = await axios.post(
         `${NVIDIA_API_BASE}/chat/completions`,
         {
-          model: INFERENCE_MODEL,
+          model,
           messages: [
             {
               role: "user",
@@ -86,9 +106,7 @@ async function inferenceWithRetry(
         }
       );
 
-      const text =
-        response.data?.choices?.[0]?.message?.content ||
-        "No response from Nvidia";
+      const text = response.data?.choices?.[0]?.message?.content || "No response from Nvidia";
 
       return {
         ok: true,
@@ -99,18 +117,30 @@ async function inferenceWithRetry(
     } catch (error) {
       lastError =
         error instanceof AxiosError
-          ? error.response?.data?.error?.message ||
-            error.message ||
-            "Unknown error"
+          ? (error.response?.data?.error?.message as string) || error.message || "Unknown error"
           : error instanceof Error
           ? error.message
           : String(error);
 
       keyRotation.lastError = lastError;
 
+      // If the error indicates the model doesn't exist or access denied for this model, rotate to next key/model and continue
+      if (isModelNotFoundError(error) && attempt < maxAttempts - 1) {
+        rotateToNextKey();
+        continue;
+      }
+
+      // For other transient errors, also rotate keys and retry until maxAttempts
       if (attempt < maxAttempts - 1) {
         rotateToNextKey();
+        continue;
       }
+
+      // Exhausted attempts or unrecoverable error
+      return {
+        ok: false,
+        error: `Nvidia API error: ${lastError}`,
+      };
     }
   }
 
@@ -132,6 +162,7 @@ export const NvidiaService = {
       currentKeyIndex: keyRotation.currentIndex,
       totalKeys: NVIDIA_API_KEYS.length,
       lastError: keyRotation.lastError,
+      models: NVIDIA_MODELS.length > 0 ? NVIDIA_MODELS : [DEFAULT_INFERENCE_MODEL],
     };
   },
 };
