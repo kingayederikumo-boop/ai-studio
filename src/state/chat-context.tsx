@@ -3,7 +3,6 @@
 import React, { createContext, useContext, useState } from "react";
 import { Message } from "@/src/types/index";
 import { useSettings } from "./settings-context";
-import { ProviderRouter } from "@/src/services/providerRouter";
 
 type ChatContextType = {
   messages: Message[];
@@ -49,15 +48,22 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     setError(undefined);
 
     try {
-      const provider = ProviderRouter.selectArchitecture(settings);
-      const response = await ProviderRouter.generateText(content, provider);
+      const provider = settings.architectureProvider === "Nvidia" ? "nvidia" : "openai";
 
-      if (!response.ok) {
-        setError(response.error);
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: content, provider }),
+      });
+
+      const data = await res.json();
+
+      if (!data.ok) {
+        setError(data.error || "Unknown error");
         const errorMessage: Message = {
           id: generateId(),
           role: "assistant",
-          content: `Error: ${response.error}`,
+          content: `Error: ${data.error || "Unknown error"}`,
           createdAt: new Date().toISOString(),
         };
         setMessages((m) => [...m, errorMessage]);
@@ -65,7 +71,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         const assistantMessage: Message = {
           id: generateId(),
           role: "assistant",
-          content: response.text || "No response received",
+          content: data.text || "No response received",
           createdAt: new Date().toISOString(),
         };
         setMessages((m) => [...m, assistantMessage]);

@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { GitHubService } from "@/src/services/githubService";
 import { RepositoryCard } from "@/src/components/github/repository-card";
 import type { GitHubRepository } from "@/src/types/index";
 
@@ -13,15 +12,22 @@ export default function GitHubPage() {
   useEffect(() => {
     let mounted = true;
     (async () => {
-      const result = await GitHubService.listRepositories();
-      if (mounted) {
-        if (result.ok) {
-          setRepos(result.payload || []);
-        } else {
-          setError(result.error);
+      try {
+        const res = await fetch("/api/github/list");
+        const data = await res.json();
+        if (!mounted) return;
+        if (!data.ok) {
+          setError(data.error || "Failed to fetch");
           setRepos([]);
+        } else {
+          setRepos(data.repos || []);
         }
-        setLoading(false);
+      } catch (err) {
+        if (!mounted) return;
+        setError(err instanceof Error ? err.message : String(err));
+        setRepos([]);
+      } finally {
+        if (mounted) setLoading(false);
       }
     })();
     return () => {
