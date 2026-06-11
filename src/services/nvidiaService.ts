@@ -18,11 +18,18 @@ const NVIDIA_API_KEYS = [
   process.env.NVIDIA_API_KEY_4,
 ].filter(Boolean) as string[];
 
-// Models can be provided as a comma-separated env var. If a list is provided and matches the number of keys,
-// each key will be used with the model at the corresponding index. Otherwise, a single default model is used for all keys.
+// Models can be provided as a comma-separated env var mapped to keys, or left blank.
 const NVIDIA_MODELS_ENV = process.env.NVIDIA_MODELS || "";
 const NVIDIA_MODELS = NVIDIA_MODELS_ENV.split(",").map((s) => s.trim()).filter(Boolean);
 const DEFAULT_INFERENCE_MODEL = process.env.NVIDIA_INFERENCE_MODEL || "meta/llama-2-70b-chat";
+
+// Default candidate models to try when no explicit mapping is provided
+const DEFAULT_MODEL_CANDIDATES = [
+  "meta/llama-2-70b-chat",
+  "meta/llama-2-13b-chat",
+  "meta/llama-2-7b-chat",
+  "meta/llama-2-3b-chat",
+];
 
 const NVIDIA_API_BASE = "https://integrate.api.nvidia.com/v1";
 
@@ -41,13 +48,23 @@ function getCurrentKey(): string | null {
   return NVIDIA_API_KEYS[keyRotation.currentIndex];
 }
 
-function getModelForCurrentKey(): string {
-  if (NVIDIA_MODELS.length === 0) return DEFAULT_INFERENCE_MODEL;
-  // If models array length matches keys, map by index; otherwise use first model for all keys
+export function setCurrentKeyIndex(index: number) {
+  if (NVIDIA_API_KEYS.length === 0) return null;
+  if (index < 0 || index >= NVIDIA_API_KEYS.length) return null;
+  keyRotation.currentIndex = index;
+  return keyRotation.currentIndex;
+}
+
+function getModelCandidatesForKey(index: number): string[] {
+  // If NVIDIA_MODELS has the same length as keys, each key has its own mapped model (single)
   if (NVIDIA_MODELS.length === NVIDIA_API_KEYS.length) {
-    return NVIDIA_MODELS[keyRotation.currentIndex] || DEFAULT_INFERENCE_MODEL;
+    const model = NVIDIA_MODELS[index] || DEFAULT_INFERENCE_MODEL;
+    return [model];
   }
-  return NVIDIA_MODELS[0] || DEFAULT_INFERENCE_MODEL;
+  // If a list of models provided but does not match keys, try that list first
+  if (NVIDIA_MODELS.length > 0) return NVIDIA_MODELS;
+  // Default candidate list
+  return DEFAULT_MODEL_CANDIDATES;
 }
 
 function rotateToNextKey(): string | null {
@@ -59,6 +76,45 @@ function rotateToNextKey(): string | null {
 function isModelNotFoundError(err: any): boolean {
   const msg = err instanceof Error ? err.message : String(err);
   return /model not found|does not exist|404/.test(msg.toLowerCase());
+}
+
+async function tryModelWithKey(prompt: string, key: string, model: string): Promise<{ ok: boolean; text?: string; error?: string; status?: number }> {
+  try {
+    const response = await axios.post(
+      `${NVIDIA_API_BASE}/chat/completions`,
+      {
+        model,
+        messages: [
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
+        temperature: 0.7,
+        top_p: 0.7,
+        max_tokens: 1024,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${key}`,
+          "Content-Type": "application/json",
+        },
+        timeout: 30000,
+      }
+    );
+
+    const text = response.data?.choices?.[0]?.message?.content || "";
+    return { ok: true, text };
+  } catch (error) {
+    const lastError =
+      error instanceof AxiosError
+        ? (error.response?.data?.error?.message as string) || error.message || "Unknown error"
+        : error instanceof Error
+        ? error.message
+        : String(error);
+    const status = error instanceof AxiosError ? error.response?.status : undefined;
+    return { ok: false, error: lastError, status };
+  }
 }
 
 async function inferenceWithRetry(
@@ -80,67 +136,31 @@ async function inferenceWithRetry(
       };
     }
 
-    const model = getModelForCurrentKey();
+    const modelCandidates = getModelCandidatesForKey(keyRotation.currentIndex);
 
-    try {
-      const response = await axios.post(
-        `${NVIDIA_API_BASE}/chat/completions`,
-        {
-          model,
-          messages: [
-            {
-              role: "user",
-              content: prompt,
-            },
-          ],
-          temperature: 0.7,
-          top_p: 0.7,
-          max_tokens: 1024,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${key}`,
-            "Content-Type": "application/json",
-          },
-          timeout: 30000,
-        }
-      );
+    for (const model of modelCandidates) {
+      const res = await tryModelWithKey(prompt, key, model);
+      if (res.ok) {
+        // success
+        return { ok: true, payload: { text: res.text || "" } };
+      }
 
-      const text = response.data?.choices?.[0]?.message?.content || "No response from Nvidia";
+      // record last error
+      lastError = res.error || lastError;
 
-      return {
-        ok: true,
-        payload: {
-          text,
-        },
-      };
-    } catch (error) {
-      lastError =
-        error instanceof AxiosError
-          ? (error.response?.data?.error?.message as string) || error.message || "Unknown error"
-          : error instanceof Error
-          ? error.message
-          : String(error);
-
-      keyRotation.lastError = lastError;
-
-      // If the error indicates the model doesn't exist or access denied for this model, rotate to next key/model and continue
-      if (isModelNotFoundError(error) && attempt < maxAttempts - 1) {
-        rotateToNextKey();
+      // If model not found for this model, try next model candidate with the same key
+      if (res.status === 404 || isModelNotFoundError(res.error)) {
         continue;
       }
 
-      // For other transient errors, also rotate keys and retry until maxAttempts
-      if (attempt < maxAttempts - 1) {
-        rotateToNextKey();
-        continue;
-      }
+      // For other errors, try next model candidate first; if exhausted, rotate to next key
+      // continue to next candidate
+    }
 
-      // Exhausted attempts or unrecoverable error
-      return {
-        ok: false,
-        error: `Nvidia API error: ${lastError}`,
-      };
+    // After trying all candidates for this key, rotate to the next key and try again
+    keyRotation.lastError = lastError;
+    if (attempt < maxAttempts - 1) {
+      rotateToNextKey();
     }
   }
 
@@ -162,7 +182,9 @@ export const NvidiaService = {
       currentKeyIndex: keyRotation.currentIndex,
       totalKeys: NVIDIA_API_KEYS.length,
       lastError: keyRotation.lastError,
-      models: NVIDIA_MODELS.length > 0 ? NVIDIA_MODELS : [DEFAULT_INFERENCE_MODEL],
+      models: NVIDIA_MODELS.length > 0 ? NVIDIA_MODELS : DEFAULT_MODEL_CANDIDATES,
     };
   },
+
+  setCurrentKeyIndex,
 };
