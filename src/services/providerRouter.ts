@@ -8,6 +8,7 @@ export interface ProviderResponse {
   ok: boolean;
   text?: string;
   error?: string;
+  provider?: ProviderType;
 }
 
 export const ProviderRouter = {
@@ -29,20 +30,30 @@ export const ProviderRouter = {
       if (provider === "nvidia") {
         const result = await NvidiaService.inference(prompt);
         if (!result.ok) {
-          return { ok: false, error: result.error };
+          return { ok: false, error: result.error, provider: "nvidia" };
         }
         return {
           ok: true,
           text: result.payload?.text,
+          provider: "nvidia",
         };
       } else {
         const result = await OpenAIService.generateText(prompt);
         if (!result.ok) {
-          return { ok: false, error: result.error };
+          // If OpenAI returns a quota error (429) or a message indicating quota, try Nvidia fallback
+          const err = result.error || "";
+          if (err.toLowerCase().includes("quota") || err.includes("429")) {
+            const n = await NvidiaService.inference(prompt);
+            if (n.ok) return { ok: true, text: n.payload?.text, provider: "nvidia" };
+            return { ok: false, error: `OpenAI quota exceeded and Nvidia fallback failed: ${n.error}`, provider: "nvidia" };
+          }
+
+          return { ok: false, error: result.error, provider: "openai" };
         }
         return {
           ok: true,
           text: result.payload?.text,
+          provider: "openai",
         };
       }
     } catch (error) {
