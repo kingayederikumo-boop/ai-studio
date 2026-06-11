@@ -47,20 +47,42 @@ async function makeRequest<T>(
   } catch (error) {
     const errorMessage =
       error instanceof AxiosError
-        ? error.response?.data?.message ||
-          error.message ||
-          "Unknown error"
+        ? error.response?.data?.message || error.message || "Unknown error"
         : error instanceof Error
-          ? error.message
-          : String(error);
+        ? error.message
+        : String(error);
     return { ok: false, error: `GitHub API error: ${errorMessage}` };
   }
 }
 
+async function makeRequestWithMethod<T>(
+  url: string,
+  method: "PUT" | "POST" | "DELETE",
+  body?: any
+): Promise<{ ok: boolean; data?: T; error?: string; status?: number }> {
+  try {
+    const response = await axios.request<T>({
+      url,
+      method,
+      headers: getHeaders(),
+      timeout: 30000,
+      data: body,
+    });
+    return { ok: true, data: response.data, status: response.status };
+  } catch (error) {
+    const errorMessage =
+      error instanceof AxiosError
+        ? error.response?.data?.message || error.message || "Unknown error"
+        : error instanceof Error
+        ? error.message
+        : String(error);
+    const status = error instanceof AxiosError ? error.response?.status : undefined;
+    return { ok: false, error: `GitHub API error: ${errorMessage}`, status };
+  }
+}
+
 export const GitHubService = {
-  async listRepositories(): Promise<
-    GitHubResponse<GitHubRepository[]>
-  > {
+  async listRepositories(): Promise<GitHubResponse<GitHubRepository[]>> {
     const token = getAuthToken();
     if (!token) {
       return {
@@ -233,5 +255,162 @@ export const GitHubService = {
     }));
 
     return { ok: true, payload: commits };
+  },
+
+  // === New write methods ===
+  async getFileSha(
+    owner: string,
+    repo: string,
+    path: string
+  ): Promise<{ ok: boolean; sha?: string; error?: string }> {
+    const res = await makeRequest<any>(
+      `${GITHUB_API_BASE}/repos/${owner}/${repo}/contents/${encodeURIComponent(
+        path
+      )}`
+    );
+    if (!res.ok) return { ok: false, error: res.error };
+    if (!res.data) return { ok: false, error: "no data" };
+    return { ok: true, sha: res.data.sha };
+  },
+
+  async createOrUpdateFile(
+    owner: string,
+    repo: string,
+    path: string,
+    content: string,
+    message: string,
+    branch = "main"
+  ): Promise<GitHubResponse<{ commitUrl?: string }>> {
+    const token = getAuthToken();
+    if (!token) return { ok: false, error: "GitHub API token not configured" };
+
+    try {
+      // Try to get existing file sha
+      const getRes = await makeRequest<any>(
+        `${GITHUB_API_BASE}/repos/${owner}/${repo}/contents/${encodeURIComponent(
+          path
+        )}`
+      );
+
+      const sha = getRes.ok && getRes.data?.sha ? getRes.data.sha : undefined;
+      const encoded = Buffer.from(content).toString("base64");
+
+      const body: any = {
+        message,
+        content: encoded,
+        branch,
+      };
+      if (sha) body.sha = sha;
+
+      const putRes = await makeRequestWithMethod<any>(
+        `${GITHUB_API_BASE}/repos/${owner}/${repo}/contents/${encodeURIComponent(
+          path
+        )}`,
+        "PUT",
+        body
+      );
+
+      if (!putRes.ok) return { ok: false, error: putRes.error };
+      return { ok: true, payload: { commitUrl: putRes.data?.content?.html_url } };
+    } catch (error) {
+      const errMsg = error instanceof Error ? error.message : String(error);
+      return { ok: false, error: errMsg };
+    }
+  },
+
+  async deleteFile(
+    owner: string,
+    repo: string,
+    path: string,
+    message: string,
+    branch = "main"
+  ): Promise<GitHubResponse<{}>> {
+    const token = getAuthToken();
+    if (!token) return { ok: false, error: "GitHub API token not configured" };
+
+    try {
+      const getRes = await makeRequest<any>(
+        `${GITHUB_API_BASE}/repos/${owner}/${repo}/contents/${encodeURIComponent(
+          path
+        )}`
+      );
+      if (!getRes.ok) return { ok: false, error: getRes.error };
+      const sha = getRes.data?.sha;
+      if (!sha) return { ok: false, error: "file sha not found" };
+
+      const delRes = await makeRequestWithMethod<any>(
+        `${GITHUB_API_BASE}/repos/${owner}/${repo}/contents/${encodeURIComponent(
+          path
+        )}`,
+        "DELETE",
+        { message, sha, branch }
+      );
+
+      if (!delRes.ok) return { ok: false, error: delRes.error };
+      return { ok: true };
+    } catch (error) {
+      const errMsg = error instanceof Error ? error.message : String(error);
+      return { ok: false, error: errMsg };
+    }
+  },
+
+  async createBranch(
+    owner: string,
+    repo: string,
+    branchName: string,
+    from = "main"
+  ): Promise<GitHubResponse<{ ref?: string }>> {
+    const token = getAuthToken();
+    if (!token) return { ok: false, error: "GitHub API token not configured" };
+
+    try {
+      // get ref for base
+      const refRes = await makeRequest<any>(
+        `${GITHUB_API_BASE}/repos/${owner}/${repo}/git/ref/heads/${encodeURIComponent(
+          from
+        )}`
+      );
+      if (!refRes.ok) return { ok: false, error: refRes.error };
+      const sha = refRes.data?.object?.sha || refRes.data?.sha;
+      if (!sha) return { ok: false, error: "base sha not found" };
+
+      const postRes = await makeRequestWithMethod<any>(
+        `${GITHUB_API_BASE}/repos/${owner}/${repo}/git/refs`,
+        "POST",
+        { ref: `refs/heads/${branchName}`, sha }
+      );
+
+      if (!postRes.ok) return { ok: false, error: postRes.error };
+      return { ok: true, payload: { ref: postRes.data?.ref } };
+    } catch (error) {
+      const errMsg = error instanceof Error ? error.message : String(error);
+      return { ok: false, error: errMsg };
+    }
+  },
+
+  async createPullRequest(
+    owner: string,
+    repo: string,
+    head: string,
+    base = "main",
+    title?: string,
+    body?: string
+  ): Promise<GitHubResponse<{ url?: string }>> {
+    const token = getAuthToken();
+    if (!token) return { ok: false, error: "GitHub API token not configured" };
+
+    try {
+      const postRes = await makeRequestWithMethod<any>(
+        `${GITHUB_API_BASE}/repos/${owner}/${repo}/pulls`,
+        "POST",
+        { title: title || `Automated PR: ${head} -> ${base}`, head, base, body }
+      );
+
+      if (!postRes.ok) return { ok: false, error: postRes.error };
+      return { ok: true, payload: { url: postRes.data?.html_url } };
+    } catch (error) {
+      const errMsg = error instanceof Error ? error.message : String(error);
+      return { ok: false, error: errMsg };
+    }
   },
 };
