@@ -4,7 +4,11 @@ import AppShell from "@/src/components/AppShell";
 
 export const metadata: Metadata = {
   title: "AI Studio",
-  description: "AI Studio — foundation",
+  description: "AI Studio — Advanced Intelligence",
+  icons: {
+    icon: "/logo.svg",
+    apple: "/logo.svg",
+  },
 };
 
 export default function RootLayout({
@@ -14,6 +18,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="h-full antialiased">
+      <head>
+        <link rel="icon" href="/logo.svg" type="image/svg+xml" />
+      </head>
       <body className="min-h-full flex flex-col">
         <AppShell>{children}</AppShell>
       </body>
