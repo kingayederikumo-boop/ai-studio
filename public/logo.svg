@@ -1,34 +1,37 @@
 <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
-  <!-- Background -->
-  <rect width="1024" height="1024" fill="#0F1419" rx="256"/>
-  
-  <!-- Gradient definitions -->
   <defs>
-    <linearGradient id="gradientA" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#00E5FF;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#2E5FFF;stop-opacity:1" />
+    <linearGradient id="gradA" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#00D9FF;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0066FF;stop-opacity:1" />
     </linearGradient>
-    <linearGradient id="gradientB" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#2E5FFF;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#A84EFF;stop-opacity:1" />
+    <linearGradient id="gradB" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0066FF;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#A020F0;stop-opacity:1" />
     </linearGradient>
   </defs>
   
-  <!-- Letter A -->
-  <g>
-    <!-- Left stroke of A -->
-    <polygon points="240,750 470,280 550,280 780,750 680,750 630,630 390,630 340,750" fill="url(#gradientA)" stroke="none"/>
-  </g>
+  <!-- Triangle "A" -->
+  <path d="M 300 750 L 500 250 L 700 750 Z" fill="none" stroke="url(#gradA)" stroke-width="80" stroke-linejoin="round"/>
+  <line x1="380" y1="550" x2="620" y2="550" stroke="url(#gradA)" stroke-width="80" stroke-linecap="round"/>
   
-  <!-- Letter S/5 shape -->
+  <!-- "5" shape with rounded elements -->
   <g>
-    <!-- Top curve -->
-    <path d="M 820 350 Q 950 350 950 420 Q 950 480 850 500 L 750 520" fill="none" stroke="url(#gradientB)" stroke-width="120" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- Top horizontal bar -->
+    <line x1="750" y1="280" x2="880" y2="280" stroke="url(#gradB)" stroke-width="80" stroke-linecap="round"/>
     
-    <!-- Middle section -->
-    <path d="M 750 520 Q 850 540 950 580 Q 950 640 820 660" fill="none" stroke="url(#gradientB)" stroke-width="120" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- Middle curve (top right) -->
+    <path d="M 880 280 Q 920 280 920 340 Q 920 380 880 400" fill="none" stroke="url(#gradB)" stroke-width="80" stroke-linecap="round" stroke-linejoin="round"/>
     
-    <!-- Bottom curve -->
-    <path d="M 820 660 Q 700 660 700 730 Q 700 780 800 800 Q 900 820 950 800" fill="none" stroke="url(#gradientB)" stroke-width="120" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- Middle horizontal -->
+    <line x1="750" y1="400" x2="880" y2="400" stroke="url(#gradB)" stroke-width="80" stroke-linecap="round"/>
+    
+    <!-- Bottom curve (bottom right) -->
+    <path d="M 880 400 Q 920 400 920 460 Q 920 500 880 520" fill="none" stroke="url(#gradB)" stroke-width="80" stroke-linecap="round" stroke-linejoin="round"/>
+    
+    <!-- Bottom horizontal bar -->
+    <line x1="750" y1="520" x2="880" y2="520" stroke="url(#gradB)" stroke-width="80" stroke-linecap="round"/>
+    
+    <!-- Extended bottom curve -->
+    <path d="M 880 520 Q 920 520 920 580 Q 920 640 840 680" fill="none" stroke="url(#gradB)" stroke-width="80" stroke-linecap="round" stroke-linejoin="round"/>
   </g>
 </svg>
