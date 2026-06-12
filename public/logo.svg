@@ -1,0 +1,34 @@
+<svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="1024" height="1024" fill="#0F1419" rx="256"/>
+  
+  <!-- Gradient definitions -->
+  <defs>
+    <linearGradient id="gradientA" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#00E5FF;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#2E5FFF;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="gradientB" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#2E5FFF;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#A84EFF;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Letter A -->
+  <g>
+    <!-- Left stroke of A -->
+    <polygon points="240,750 470,280 550,280 780,750 680,750 630,630 390,630 340,750" fill="url(#gradientA)" stroke="none"/>
+  </g>
+  
+  <!-- Letter S/5 shape -->
+  <g>
+    <!-- Top curve -->
+    <path d="M 820 350 Q 950 350 950 420 Q 950 480 850 500 L 750 520" fill="none" stroke="url(#gradientB)" stroke-width="120" stroke-linecap="round" stroke-linejoin="round"/>
+    
+    <!-- Middle section -->
+    <path d="M 750 520 Q 850 540 950 580 Q 950 640 820 660" fill="none" stroke="url(#gradientB)" stroke-width="120" stroke-linecap="round" stroke-linejoin="round"/>
+    
+    <!-- Bottom curve -->
+    <path d="M 820 660 Q 700 660 700 730 Q 700 780 800 800 Q 900 820 950 800" fill="none" stroke="url(#gradientB)" stroke-width="120" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>
