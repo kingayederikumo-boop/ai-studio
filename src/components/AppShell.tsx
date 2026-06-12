@@ -5,6 +5,7 @@ import { ChatProvider } from "@/src/state/chat-context";
 import { SettingsProvider } from "@/src/state/settings-context";
 import { MobileSidebar } from "@/src/components/mobile-sidebar";
 import Header from "@/src/components/header";
+import Splash from "@/src/components/Splash";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -19,10 +20,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <div className="flex-1 flex flex-col">
               <Header onOpenMenu={() => setMobileOpen(true)} />
 
-              <main className="flex-1 overflow-hidden">{children}</main>
+              <main className="flex-1 overflow-hidden relative">{children}</main>
             </div>
           </div>
         </div>
+
+        {/* Splash is rendered at top-level so it overlays the whole app on initial load */}
+        <Splash />
       </ChatProvider>
     </SettingsProvider>
   );

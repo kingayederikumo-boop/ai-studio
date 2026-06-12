@@ -18,6 +18,9 @@ export default function Header({ onOpenMenu }: HeaderProps) {
           </svg>
         </button>
 
+        {/* App logo (uses public/logo.png) */}
+        <img src="/logo.png" alt="AI Studio" className="w-8 h-8 rounded-md object-contain hidden sm:block" />
+
         <h1 className="text-lg font-semibold">AI Studio</h1>
       </div>
 
