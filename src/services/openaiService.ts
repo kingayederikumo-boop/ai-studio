@@ -4,6 +4,7 @@ export type OpenAIResponse<T = unknown> = {
   ok: boolean;
   payload?: T;
   error?: string;
+  status?: number;
 };
 
 export interface OpenAIGenerateTextPayload {
@@ -87,15 +88,24 @@ export const OpenAIService = {
         }
 
         return { ok: true, payload: { text } };
-      } catch (err) {
+      } catch (err: any) {
         const message = err instanceof Error ? err.message : String(err);
         lastError = message;
+        // If this is an HTTP-like error and contains a status, surface it
+        const status = err?.response?.status || err?.status || undefined;
+
         // If model-specific error (not found / no access), try the next model
         if (isModelNotFoundError(err)) {
           continue;
         }
+
+        // If it's a 429/quota error, return with status so caller can fallback
+        if (status === 429 || message.toLowerCase().includes("quota") || message.includes("429")) {
+          return { ok: false, error: `OpenAI API error: ${message}`, status: 429 };
+        }
+
         // For other errors return immediately
-        return { ok: false, error: `OpenAI API error: ${message}` };
+        return { ok: false, error: `OpenAI API error: ${message}`, status };
       }
     }
 
