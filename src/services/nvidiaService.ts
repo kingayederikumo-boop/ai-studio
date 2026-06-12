@@ -113,6 +113,10 @@ async function tryModelWithKey(prompt: string, key: string, model: string): Prom
         ? error.message
         : String(error);
     const status = error instanceof AxiosError ? error.response?.status : undefined;
+    // Annotate 404 errors so callers can provide better guidance
+    if (status === 404) {
+      return { ok: false, error: `Nvidia API returned 404 for model/endpoint: ${model}. ${lastError}`, status };
+    }
     return { ok: false, error: lastError, status };
   }
 }
@@ -126,6 +130,8 @@ async function inferenceWithRetry(
 
   let lastError: string | null = null;
   const maxAttempts = NVIDIA_API_KEYS.length;
+  // Track whether every attempt resulted in a 404 (endpoint/model not found)
+  let allAttemptsWere404 = true;
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const key = getCurrentKey();
@@ -148,10 +154,14 @@ async function inferenceWithRetry(
       // record last error
       lastError = res.error || lastError;
 
-      // If model not found for this model, try next model candidate with the same key
+      // If model not found (404) for this model, try next model candidate with the same key
       if (res.status === 404 || isModelNotFoundError(res.error)) {
+        // this attempt was a 404; keep allAttemptsWere404 true unless we see a non-404 later
         continue;
       }
+
+      // Mark that we saw a non-404 error (so not all attempts are 404)
+      allAttemptsWere404 = false;
 
       // For other errors, try next model candidate first; if exhausted, rotate to next key
       // continue to next candidate
@@ -162,6 +172,16 @@ async function inferenceWithRetry(
     if (attempt < maxAttempts - 1) {
       rotateToNextKey();
     }
+  }
+
+  // If every request returned 404, return a specific actionable error to help debugging
+  if (allAttemptsWere404) {
+    return {
+      ok: false,
+      error:
+        `Nvidia API returned 404 for all tried models/endpoints. This usually means the configured NVIDIA_API_BASE, model names, or API keys are incorrect or not authorized. ` +
+        `Check your NVIDIA_API_BASE, ensure the endpoint exists, verify model names (NVIDIA_MODELS / NVIDIA_INFERENCE_MODEL), and confirm the API key(s) have access. Last error: ${lastError}`,
+    };
   }
 
   return {
