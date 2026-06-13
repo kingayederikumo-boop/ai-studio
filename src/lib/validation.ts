@@ -25,10 +25,10 @@ export function validatePrompt(prompt: string): ValidationError[] {
     errors.push({ field: 'prompt', message: `Prompt must not exceed ${MAX_PROMPT_LENGTH} characters` });
   }
 
-  // Optional: Add pattern validation for basic injection prevention
-  // if (!PROMPT_PATTERN.test(trimmed)) {
-  //   errors.push({ field: 'prompt', message: 'Prompt contains invalid characters' });
-  // }
+  // Enforce pattern validation for injection prevention
+  if (!PROMPT_PATTERN.test(trimmed)) {
+    errors.push({ field: 'prompt', message: 'Prompt contains invalid characters' });
+  }
 
   return errors;
 }
