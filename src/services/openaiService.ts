@@ -1,4 +1,5 @@
-import OpenAI from "openai";
+import OpenAI from 'openai';
+import { redactApiKey } from '@/src/lib/auth';
 
 export type OpenAIResponse<T = unknown> = {
   ok: boolean;
@@ -14,14 +15,14 @@ export interface OpenAIGenerateTextPayload {
 const API_KEY = process.env.OPENAI_API_KEY;
 // Model can be provided via env. If not provided, we'll try a prioritized list.
 const ENV_MODEL = process.env.OPENAI_MODEL;
-const DEFAULT_MODEL_CANDIDATES = ["gpt-4o", "gpt-4o-mini", "gpt-3.5-turbo"];
+const DEFAULT_MODEL_CANDIDATES = ['gpt-4o', 'gpt-4o-mini', 'gpt-3.5-turbo'];
 
 let openaiClient: OpenAI | null = null;
 
 function getClient(): OpenAI {
   if (!openaiClient) {
     if (!API_KEY) {
-      throw new Error("OpenAI API key not configured");
+      throw new Error('OpenAI API key not configured');
     }
     openaiClient = new OpenAI({ apiKey: API_KEY });
   }
@@ -33,16 +34,16 @@ function extractTextFromChatResponse(response: any): string | null {
     const choice = response?.choices?.[0];
     if (!choice) return null;
     const msg = choice.message;
-    if (typeof msg === "string") return msg;
+    if (typeof msg === 'string') return msg;
     if (msg) {
       const content = msg.content;
-      if (typeof content === "string") return content;
+      if (typeof content === 'string') return content;
       if (Array.isArray(content) && content.length > 0) {
-        const part = content.find((p: any) => typeof p?.text === "string") || content[0];
+        const part = content.find((p: any) => typeof p?.text === 'string') || content[0];
         return part?.text ?? null;
       }
     }
-    if (typeof choice.text === "string") return choice.text;
+    if (typeof choice.text === 'string') return choice.text;
   } catch (e) {
     // ignore
   }
@@ -54,12 +55,16 @@ function isModelNotFoundError(err: any): boolean {
   return /does not exist|model not found|404/.test(msg.toLowerCase());
 }
 
+function sanitizeError(err: any): string {
+  const msg = err instanceof Error ? err.message : String(err);
+  // Remove API key from error messages
+  return msg.replace(new RegExp(API_KEY ? API_KEY.substring(0, 10) : '', 'g'), '[REDACTED]');
+}
+
 export const OpenAIService = {
-  async generateText(
-    prompt: string
-  ): Promise<OpenAIResponse<OpenAIGenerateTextPayload>> {
+  async generateText(prompt: string): Promise<OpenAIResponse<OpenAIGenerateTextPayload>> {
     if (!API_KEY) {
-      return { ok: false, error: "OpenAI API key not configured" };
+      return { ok: false, error: 'OpenAI API key not configured' };
     }
 
     const client = getClient();
@@ -73,7 +78,7 @@ export const OpenAIService = {
           model,
           messages: [
             {
-              role: "user",
+              role: 'user',
               content: prompt,
             },
           ],
@@ -83,13 +88,13 @@ export const OpenAIService = {
 
         const text = extractTextFromChatResponse(response as any);
         if (!text) {
-          lastError = "Unable to parse OpenAI response";
+          lastError = 'Unable to parse OpenAI response';
           continue;
         }
 
         return { ok: true, payload: { text } };
       } catch (err: any) {
-        const message = err instanceof Error ? err.message : String(err);
+        const message = sanitizeError(err);
         lastError = message;
         // If this is an HTTP-like error and contains a status, surface it
         const status = err?.response?.status || err?.status || undefined;
@@ -100,8 +105,8 @@ export const OpenAIService = {
         }
 
         // If it's a 429/quota error, return with status so caller can fallback
-        if (status === 429 || message.toLowerCase().includes("quota") || message.includes("429")) {
-          return { ok: false, error: `OpenAI API error: ${message}`, status: 429 };
+        if (status === 429 || message.toLowerCase().includes('quota') || message.includes('429')) {
+          return { ok: false, error: `OpenAI API quota exceeded`, status: 429 };
         }
 
         // For other errors return immediately

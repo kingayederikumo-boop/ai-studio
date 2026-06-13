@@ -1,51 +1,217 @@
-import { ConversationSummaryBufferMemory } from "langchain/memory";
-import { ChatOpenAI } from "@langchain/openai";
+import { ConversationSummaryBufferMemory } from 'langchain/memory';
+import { ChatOpenAI } from '@langchain/openai';
+import { supabaseAdmin } from '@/src/lib/supabase';
 
-// In-memory storage for sessions
-// In production, this would be a database (Redis, PostgreSQL, etc.)
-const sessionMemories = new Map<string, ConversationSummaryBufferMemory>();
+const SESSION_EXPIRY_HOURS = 24;
+
+interface SessionMessage {
+  id?: string;
+  session_id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  created_at?: string;
+}
+
+interface SessionRecord {
+  id?: string;
+  session_id: string;
+  summary?: string;
+  last_activity: string;
+  created_at?: string;
+}
+
+// In-memory cache for active sessions (with TTL)
+const sessionMemoriesCache = new Map<string, { memory: ConversationSummaryBufferMemory; expiresAt: number }>();
 
 const llmForSummary = new ChatOpenAI({
   openAIApiKey: process.env.OPENAI_API_KEY,
-  modelName: "gpt-3.5-turbo",
+  modelName: 'gpt-3.5-turbo',
   temperature: 0,
 });
 
+function isSessionExpired(expiresAt: number): boolean {
+  return Date.now() > expiresAt;
+}
+
+function getSessionExpiry(): number {
+  return Date.now() + SESSION_EXPIRY_HOURS * 60 * 60 * 1000;
+}
+
 export const MemoryService = {
   /**
+   * Initialize or retrieve session in Supabase
+   */
+  async initializeSession(sessionId: string): Promise<SessionRecord> {
+    if (!supabaseAdmin) {
+      throw new Error('Supabase admin client not configured');
+    }
+
+    // Check if session exists
+    const { data: existing, error: fetchError } = await supabaseAdmin
+      .from('chat_sessions')
+      .select('*')
+      .eq('session_id', sessionId)
+      .single();
+
+    if (fetchError && fetchError.code !== 'PGRST116') {
+      // PGRST116 = no rows found (expected)
+      throw fetchError;
+    }
+
+    if (existing) {
+      return existing as SessionRecord;
+    }
+
+    // Create new session
+    const { data: newSession, error: insertError } = await supabaseAdmin
+      .from('chat_sessions')
+      .insert([{ session_id: sessionId, last_activity: new Date().toISOString() }])
+      .select()
+      .single();
+
+    if (insertError) throw insertError;
+    return newSession as SessionRecord;
+  },
+
+  /**
    * Get or create memory for a session
-   * Uses ConversationSummaryBufferMemory which:
-   * - Keeps last 10k tokens in buffer
-   * - Summarizes older messages
-   * - Max 20 messages before summary kicks in
    */
   async getSessionMemory(sessionId: string): Promise<ConversationSummaryBufferMemory> {
-    if (sessionMemories.has(sessionId)) {
-      return sessionMemories.get(sessionId)!;
+    // Check cache first
+    const cached = sessionMemoriesCache.get(sessionId);
+    if (cached && !isSessionExpired(cached.expiresAt)) {
+      return cached.memory;
     }
 
     const memory = new ConversationSummaryBufferMemory({
       llm: llmForSummary,
-      maxTokenLimit: 10000, // Keep last 10k tokens
+      maxTokenLimit: 10000,
       returnMessages: true,
-      humanPrefix: "User",
-      aiPrefix: "Assistant",
+      humanPrefix: 'User',
+      aiPrefix: 'Assistant',
     });
 
-    sessionMemories.set(sessionId, memory);
+    // Load conversation history from Supabase
+    if (supabaseAdmin) {
+      const { data: messages, error } = await supabaseAdmin
+        .from('chat_messages')
+        .select('role, content')
+        .eq('session_id', sessionId)
+        .order('created_at', { ascending: true });
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error loading session history:', error);
+      } else if (messages && messages.length > 0) {
+        for (const msg of messages) {
+          const message = msg as SessionMessage;
+          if (message.role === 'user') {
+            await memory.saveContext({ input: message.content }, { output: '' });
+          } else {
+            await memory.saveContext({ input: '' }, { output: message.content });
+          }
+        }
+      }
+    }
+
+    // Cache the memory with expiry
+    sessionMemoriesCache.set(sessionId, {
+      memory,
+      expiresAt: getSessionExpiry(),
+    });
+
     return memory;
   },
 
   /**
-   * Add a message to session memory
+   * Add a message to session memory and persist to Supabase
    */
-  async addMessage(
-    sessionId: string,
-    input: string,
-    output: string
-  ): Promise<void> {
-    const memory = await this.getSessionMemory(sessionId);
-    await memory.saveContext({ input }, { output });
+  async addToSession(sessionId: string, content: string, role: 'user' | 'assistant'): Promise<void> {
+    try {
+      // Initialize session if needed
+      await this.initializeSession(sessionId);
+
+      // Save to Supabase
+      if (supabaseAdmin) {
+        const { error } = await supabaseAdmin.from('chat_messages').insert([
+          {
+            session_id: sessionId,
+            role,
+            content,
+            created_at: new Date().toISOString(),
+          },
+        ]);
+
+        if (error) {
+          console.error('Error saving message to Supabase:', error);
+        }
+
+        // Update last activity
+        await supabaseAdmin
+          .from('chat_sessions')
+          .update({ last_activity: new Date().toISOString() })
+          .eq('session_id', sessionId);
+      }
+
+      // Also update in-memory cache
+      const memory = await this.getSessionMemory(sessionId);
+      if (role === 'user') {
+        await memory.saveContext({ input: content }, { output: '' });
+      } else {
+        await memory.saveContext({ input: '' }, { output: content });
+      }
+    } catch (error) {
+      console.error('Error adding message to session:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get session status and metadata
+   */
+  async getSessionStatus(
+    sessionId: string
+  ): Promise<{
+    exists: boolean;
+    messageCount: number;
+    summary?: string;
+    lastActivity?: string;
+  }> {
+    try {
+      await this.initializeSession(sessionId);
+
+      if (!supabaseAdmin) {
+        return { exists: false, messageCount: 0 };
+      }
+
+      const { data: messages } = await supabaseAdmin
+        .from('chat_messages')
+        .select('id')
+        .eq('session_id', sessionId);
+
+      const { data: session } = await supabaseAdmin
+        .from('chat_sessions')
+        .select('summary, last_activity')
+        .eq('session_id', sessionId)
+        .single();
+
+      return {
+        exists: true,
+        messageCount: messages?.length || 0,
+        summary: (session as any)?.summary,
+        lastActivity: (session as any)?.last_activity,
+      };
+    } catch (error) {
+      console.error('Error getting session status:', error);
+      return { exists: false, messageCount: 0 };
+    }
+  },
+
+  /**
+   * Add a message to session memory (legacy method for compatibility)
+   */
+  async addMessage(sessionId: string, input: string, output: string): Promise<void> {
+    await this.addToSession(sessionId, input, 'user');
+    await this.addToSession(sessionId, output, 'assistant');
   },
 
   /**
@@ -53,8 +219,7 @@ export const MemoryService = {
    */
   async getHistory(sessionId: string): Promise<any> {
     const memory = await this.getSessionMemory(sessionId);
-    const variables = await memory.loadMemoryVariables({});
-    return variables;
+    return memory.loadMemoryVariables({});
   },
 
   /**
@@ -63,43 +228,40 @@ export const MemoryService = {
   async getChatHistory(sessionId: string): Promise<string> {
     const memory = await this.getSessionMemory(sessionId);
     const variables = await memory.loadMemoryVariables({});
-    return variables.history || "";
+    return variables.history || '';
   },
 
   /**
-   * Clear session memory
+   * Clear session memory and Supabase data
    */
   async clearSession(sessionId: string): Promise<void> {
-    sessionMemories.delete(sessionId);
+    sessionMemoriesCache.delete(sessionId);
+
+    if (supabaseAdmin) {
+      await supabaseAdmin.from('chat_messages').delete().eq('session_id', sessionId);
+      await supabaseAdmin.from('chat_sessions').delete().eq('session_id', sessionId);
+    }
   },
 
   /**
-   * Get all active sessions (for debugging/monitoring)
+   * Get all active sessions (for monitoring)
    */
   getActiveSessions(): string[] {
-    return Array.from(sessionMemories.keys());
+    return Array.from(sessionMemoriesCache.keys()).filter((sessionId) => {
+      const cached = sessionMemoriesCache.get(sessionId);
+      return cached && !isSessionExpired(cached.expiresAt);
+    });
   },
 
   /**
-   * Get session metadata
+   * Clean up expired sessions
    */
-  async getSessionMetadata(sessionId: string): Promise<{
-    exists: boolean;
-    messageCount: number;
-    summary?: string;
-  }> {
-    const exists = sessionMemories.has(sessionId);
-    if (!exists) {
-      return { exists: false, messageCount: 0 };
+  async cleanupExpiredSessions(): Promise<void> {
+    const now = Date.now();
+    for (const [sessionId, data] of sessionMemoriesCache.entries()) {
+      if (isSessionExpired(data.expiresAt)) {
+        sessionMemoriesCache.delete(sessionId);
+      }
     }
-
-    const memory = await this.getSessionMemory(sessionId);
-    const variables = await memory.loadMemoryVariables({});
-    
-    return {
-      exists: true,
-      messageCount: (variables.history?.split("\n").filter((l: string) => l.trim()).length || 0) / 2,
-      summary: variables.summary,
-    };
   },
 };
