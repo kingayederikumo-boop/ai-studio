@@ -1,6 +1,7 @@
 import type { Settings } from "@/src/types/index";
 import { OpenAIService } from "./openaiService";
 import { NvidiaService } from "./nvidiaService";
+import { MemoryService } from "./memoryService";
 
 export type ProviderType = "openai" | "nvidia";
 
@@ -61,5 +62,34 @@ export const ProviderRouter = {
         error instanceof Error ? error.message : String(error);
       return { ok: false, error: `Provider error: ${errorMessage}` };
     }
+  },
+
+  async generateTextWithMemory(
+    prompt: string,
+    provider: ProviderType,
+    sessionId: string
+  ): Promise<ProviderResponse> {
+    try {
+      // Add prompt to session memory
+      MemoryService.addToSession(sessionId, prompt, "user");
+
+      // Generate response using the selected provider
+      const result = await this.generateText(prompt, provider);
+
+      if (result.ok && result.text) {
+        // Store assistant response in memory
+        MemoryService.addToSession(sessionId, result.text, "assistant");
+      }
+
+      return result;
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      return { ok: false, error: `Memory-based generation error: ${errorMessage}` };
+    }
+  },
+
+  getSessionMemoryStatus(sessionId: string): object {
+    return MemoryService.getSessionStatus(sessionId);
   },
 };
