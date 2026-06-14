@@ -1,6 +1,6 @@
 import { ConversationSummaryBufferMemory } from 'langchain/memory';
 import { ChatOpenAI } from '@langchain/openai';
-import { supabaseAdmin } from '@/src/lib/supabase';
+import { supabase } from '@/src/lib/supabase';
 
 const SESSION_EXPIRY_HOURS = 24;
 
@@ -42,12 +42,12 @@ export const MemoryService = {
    * Initialize or retrieve session in Supabase
    */
   async initializeSession(sessionId: string): Promise<SessionRecord> {
-    if (!supabaseAdmin) {
-      throw new Error('Supabase admin client not configured');
+    if (!supabase) {
+      throw new Error('Supabase client not configured');
     }
 
     // Check if session exists
-    const { data: existing, error: fetchError } = await supabaseAdmin
+    const { data: existing, error: fetchError } = await supabase
       .from('chat_sessions')
       .select('*')
       .eq('session_id', sessionId)
@@ -63,7 +63,7 @@ export const MemoryService = {
     }
 
     // Create new session
-    const { data: newSession, error: insertError } = await supabaseAdmin
+    const { data: newSession, error: insertError } = await supabase
       .from('chat_sessions')
       .insert([{ session_id: sessionId, last_activity: new Date().toISOString() }])
       .select()
@@ -92,8 +92,8 @@ export const MemoryService = {
     });
 
     // Load conversation history from Supabase
-    if (supabaseAdmin) {
-      const { data: messages, error } = await supabaseAdmin
+    if (supabase) {
+      const { data: messages, error } = await supabase
         .from('chat_messages')
         .select('role, content')
         .eq('session_id', sessionId)
@@ -131,8 +131,8 @@ export const MemoryService = {
       await this.initializeSession(sessionId);
 
       // Save to Supabase
-      if (supabaseAdmin) {
-        const { error } = await supabaseAdmin.from('chat_messages').insert([
+      if (supabase) {
+        const { error } = await supabase.from('chat_messages').insert([
           {
             session_id: sessionId,
             role,
@@ -146,7 +146,7 @@ export const MemoryService = {
         }
 
         // Update last activity
-        await supabaseAdmin
+        await supabase
           .from('chat_sessions')
           .update({ last_activity: new Date().toISOString() })
           .eq('session_id', sessionId);
@@ -179,16 +179,16 @@ export const MemoryService = {
     try {
       await this.initializeSession(sessionId);
 
-      if (!supabaseAdmin) {
+      if (!supabase) {
         return { exists: false, messageCount: 0 };
       }
 
-      const { data: messages } = await supabaseAdmin
+      const { data: messages } = await supabase
         .from('chat_messages')
         .select('id')
         .eq('session_id', sessionId);
 
-      const { data: session } = await supabaseAdmin
+      const { data: session } = await supabase
         .from('chat_sessions')
         .select('summary, last_activity')
         .eq('session_id', sessionId)
@@ -237,9 +237,9 @@ export const MemoryService = {
   async clearSession(sessionId: string): Promise<void> {
     sessionMemoriesCache.delete(sessionId);
 
-    if (supabaseAdmin) {
-      await supabaseAdmin.from('chat_messages').delete().eq('session_id', sessionId);
-      await supabaseAdmin.from('chat_sessions').delete().eq('session_id', sessionId);
+    if (supabase) {
+      await supabase.from('chat_messages').delete().eq('session_id', sessionId);
+      await supabase.from('chat_sessions').delete().eq('session_id', sessionId);
     }
   },
 
