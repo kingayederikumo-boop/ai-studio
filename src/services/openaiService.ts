@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import { redactApiKey } from '@/src/lib/auth';
+import { redactApiKey, sanitizeError } from '@/src/lib/validation';
 
 export type OpenAIResponse<T = unknown> = {
   ok: boolean;
@@ -55,12 +55,6 @@ function isModelNotFoundError(err: any): boolean {
   return /does not exist|model not found|404/.test(msg.toLowerCase());
 }
 
-function sanitizeError(err: any): string {
-  const msg = err instanceof Error ? err.message : String(err);
-  // Remove API key from error messages
-  return msg.replace(new RegExp(API_KEY ? API_KEY.substring(0, 10) : '', 'g'), '[REDACTED]');
-}
-
 export const OpenAIService = {
   async generateText(prompt: string): Promise<OpenAIResponse<OpenAIGenerateTextPayload>> {
     if (!API_KEY) {
@@ -94,26 +88,20 @@ export const OpenAIService = {
 
         return { ok: true, payload: { text } };
       } catch (err: any) {
-        const message = sanitizeError(err);
-        lastError = message;
+        const sanitized = sanitizeError(err);
+        lastError = sanitized;
         // If this is an HTTP-like error and contains a status, surface it
-        const status = err?.response?.status || err?.status || undefined;
-
-        // If model-specific error (not found / no access), try the next model
-        if (isModelNotFoundError(err)) {
-          continue;
+        if (err?.status) {
+          if (isModelNotFoundError(err)) {
+            continue; // Try next model
+          }
+          // Return the error with status on other HTTP errors
+          return { ok: false, error: sanitized, status: err.status };
         }
-
-        // If it's a 429/quota error, return with status so caller can fallback
-        if (status === 429 || message.toLowerCase().includes('quota') || message.includes('429')) {
-          return { ok: false, error: `OpenAI API quota exceeded`, status: 429 };
-        }
-
-        // For other errors return immediately
-        return { ok: false, error: `OpenAI API error: ${message}`, status };
+        // Continue to next model on error
       }
     }
 
-    return { ok: false, error: `OpenAI API error after trying models: ${lastError}` };
+    return { ok: false, error: lastError || 'All OpenAI models failed' };
   },
 };

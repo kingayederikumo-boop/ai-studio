@@ -1,6 +1,7 @@
 const MAX_PROMPT_LENGTH = 5000;
 const MIN_PROMPT_LENGTH = 1;
-const PROMPT_PATTERN = /^[a-zA-Z0-9\s.,!?'"()-]+$/; // Basic safe pattern
+// Expanded pattern to allow URLs, code syntax, technical characters while blocking dangerous ones
+const PROMPT_PATTERN = /^[a-zA-Z0-9\s.,!?'"()\-:/@#*$%&=+\[\]{}|;`~^<>\\]+$/;
 
 export interface ValidationError {
   field: string;
@@ -51,4 +52,20 @@ export function validateSessionId(sessionId: string): ValidationError[] {
   }
 
   return errors;
+}
+
+/**
+ * Sanitize error messages to prevent information disclosure
+ */
+export function sanitizeError(err: any): string {
+  const msg = err instanceof Error ? err.message : String(err);
+  
+  // Remove all potential API keys/tokens/secrets
+  return msg
+    .replace(/Bearer\s+[A-Za-z0-9_\-\.]+/g, 'Bearer [REDACTED]')
+    .replace(/token\s+[A-Za-z0-9_\-\.]+/g, 'token [REDACTED]')
+    .replace(/api[_-]?key[:\s=]+[A-Za-z0-9_\-\.]+/gi, 'api_key=[REDACTED]')
+    .replace(/password[:\s=]+[^\s]+/gi, 'password=[REDACTED]')
+    .replace(/secret[:\s=]+[^\s]+/gi, 'secret=[REDACTED]')
+    .replace(/authorization[:\s=]+[^\s]+/gi, 'authorization=[REDACTED]');
 }

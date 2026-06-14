@@ -11,13 +11,12 @@ export type GitHubResponse<T = unknown> = {
   error?: string;
 };
 
-// GitHub API Keys from environment
-const GITHUB_TOKEN_CLASSIC = process.env.GITHUB_TOKEN_CLASSIC;
-const GITHUB_TOKEN_FINE_GRAINED = process.env.GITHUB_TOKEN_FINE_GRAINED;
-
 const GITHUB_API_BASE = "https://api.github.com";
 
 function getAuthToken(): string | null {
+  // Read tokens at request time for Vercel environment
+  const GITHUB_TOKEN_CLASSIC = process.env.GITHUB_TOKEN_CLASSIC;
+  const GITHUB_TOKEN_FINE_GRAINED = process.env.GITHUB_TOKEN_FINE_GRAINED;
   return GITHUB_TOKEN_CLASSIC || GITHUB_TOKEN_FINE_GRAINED || null;
 }
 
@@ -33,6 +32,15 @@ function getHeaders(): Record<string, string> {
   }
 
   return headers;
+}
+
+function validateGitHubParams(owner: string, repo: string): string[] {
+  const errors: string[] = [];
+  if (!owner || typeof owner !== 'string') errors.push('Invalid owner: must be non-empty string');
+  if (!/^[a-zA-Z0-9_-]+$/.test(owner)) errors.push('Invalid owner format: alphanumeric, underscore, hyphen only');
+  if (!repo || typeof repo !== 'string') errors.push('Invalid repo: must be non-empty string');
+  if (!/^[a-zA-Z0-9_.-]+$/.test(repo)) errors.push('Invalid repo format: alphanumeric, underscore, hyphen, dot only');
+  return errors;
 }
 
 async function makeRequest<T>(
@@ -134,6 +142,15 @@ export const GitHubService = {
       };
     }
 
+    const errors = validateGitHubParams(owner, repo);
+    if (errors.length > 0) {
+      return {
+        ok: false,
+        error: `Invalid parameters: ${errors.join('; ')}`,
+        payload: null,
+      };
+    }
+
     const result = await makeRequest<{
       id: number;
       name: string;
@@ -183,6 +200,15 @@ export const GitHubService = {
       };
     }
 
+    const errors = validateGitHubParams(owner, repo);
+    if (errors.length > 0) {
+      return {
+        ok: false,
+        error: `Invalid parameters: ${errors.join('; ')}`,
+        payload: [],
+      };
+    }
+
     const filePath = path ? `/${path}` : "";
     const result = await makeRequest<
       Array<{
@@ -220,6 +246,15 @@ export const GitHubService = {
       return {
         ok: false,
         error: "GitHub API token not configured",
+        payload: [],
+      };
+    }
+
+    const errors = validateGitHubParams(owner, repo);
+    if (errors.length > 0) {
+      return {
+        ok: false,
+        error: `Invalid parameters: ${errors.join('; ')}`,
         payload: [],
       };
     }
@@ -263,6 +298,11 @@ export const GitHubService = {
     repo: string,
     path: string
   ): Promise<{ ok: boolean; sha?: string; error?: string }> {
+    const errors = validateGitHubParams(owner, repo);
+    if (errors.length > 0) {
+      return { ok: false, error: `Invalid parameters: ${errors.join('; ')}` };
+    }
+
     const res = await makeRequest<any>(
       `${GITHUB_API_BASE}/repos/${owner}/${repo}/contents/${encodeURIComponent(
         path
@@ -283,6 +323,11 @@ export const GitHubService = {
   ): Promise<GitHubResponse<{ commitUrl?: string }>> {
     const token = getAuthToken();
     if (!token) return { ok: false, error: "GitHub API token not configured" };
+
+    const errors = validateGitHubParams(owner, repo);
+    if (errors.length > 0) {
+      return { ok: false, error: `Invalid parameters: ${errors.join('; ')}` };
+    }
 
     try {
       // Try to get existing file sha
@@ -328,6 +373,11 @@ export const GitHubService = {
     const token = getAuthToken();
     if (!token) return { ok: false, error: "GitHub API token not configured" };
 
+    const errors = validateGitHubParams(owner, repo);
+    if (errors.length > 0) {
+      return { ok: false, error: `Invalid parameters: ${errors.join('; ')}` };
+    }
+
     try {
       const getRes = await makeRequest<any>(
         `${GITHUB_API_BASE}/repos/${owner}/${repo}/contents/${encodeURIComponent(
@@ -362,6 +412,11 @@ export const GitHubService = {
   ): Promise<GitHubResponse<{ ref?: string }>> {
     const token = getAuthToken();
     if (!token) return { ok: false, error: "GitHub API token not configured" };
+
+    const errors = validateGitHubParams(owner, repo);
+    if (errors.length > 0) {
+      return { ok: false, error: `Invalid parameters: ${errors.join('; ')}` };
+    }
 
     try {
       // get ref for base
@@ -398,6 +453,11 @@ export const GitHubService = {
   ): Promise<GitHubResponse<{ url?: string }>> {
     const token = getAuthToken();
     if (!token) return { ok: false, error: "GitHub API token not configured" };
+
+    const errors = validateGitHubParams(owner, repo);
+    if (errors.length > 0) {
+      return { ok: false, error: `Invalid parameters: ${errors.join('; ')}` };
+    }
 
     try {
       const postRes = await makeRequestWithMethod<any>(

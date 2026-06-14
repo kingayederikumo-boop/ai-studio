@@ -3,12 +3,24 @@ import type { NextRequest } from 'next/server';
 import { ProviderRouter } from '@/src/services/providerRouter';
 import type { ProviderType } from '@/src/services/providerRouter';
 import { MemoryService } from '@/src/services/memoryService';
-import { validateApiKey, redactApiKey } from '@/src/lib/auth';
-import { validatePrompt, validateSessionId } from '@/src/lib/validation';
+import { validateApiKey } from '@/src/lib/auth';
+import { validatePrompt, validateSessionId, sanitizeError } from '@/src/lib/validation';
 import { checkRateLimit } from '@/src/lib/rateLimiter';
+import { getCorsHeaders, validateRequestSize } from '@/src/lib/cors';
 
-// Simple UUID generation without external dependency
+// Generate cryptographically secure session ID
 function generateSessionId(): string {
+  try {
+    // Use the Web Crypto API if available (browser/Vercel)
+    if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+      const arr = new Uint8Array(16);
+      crypto.getRandomValues(arr);
+      return Array.from(arr, byte => byte.toString(16).padStart(2, '0')).join('');
+    }
+  } catch (e) {
+    // fallback
+  }
+  // Fallback for Node.js
   return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 }
 
@@ -16,20 +28,15 @@ function getClientIp(req: NextRequest): string {
   return req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown';
 }
 
-// CORS headers
-const corsHeaders = {
-  'Access-Control-Allow-Origin': process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-};
-
 // Handle preflight requests
-export async function OPTIONS() {
-  return NextResponse.json({}, { headers: corsHeaders });
+export async function OPTIONS(req: NextRequest) {
+  return NextResponse.json({}, { headers: getCorsHeaders(req) });
 }
 
 // GET handler for health checks
 export async function GET(req: NextRequest) {
+  const corsHeaders = getCorsHeaders(req);
+  
   try {
     const { valid } = validateApiKey(req);
     if (!valid) {
@@ -49,7 +56,7 @@ export async function GET(req: NextRequest) {
       { headers: corsHeaders }
     );
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    const message = sanitizeError(err);
     return NextResponse.json(
       { ok: false, error: message },
       { status: 500, headers: corsHeaders }
@@ -58,7 +65,18 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const corsHeaders = getCorsHeaders(req);
+  
   try {
+    // 0. Validate request size to prevent DoS
+    const contentLength = req.headers.get('content-length');
+    if (!validateRequestSize(contentLength, 1048576)) { // 1MB limit
+      return NextResponse.json(
+        { ok: false, error: 'Request body too large' },
+        { status: 413, headers: corsHeaders }
+      );
+    }
+
     // 1. Validate API key
     const { valid, userId } = validateApiKey(req);
     if (!valid) {
@@ -146,7 +164,7 @@ export async function POST(req: NextRequest) {
       { headers: corsHeaders }
     );
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    const message = sanitizeError(err);
     console.error('Chat API error:', { error: message, timestamp: new Date().toISOString() });
     return NextResponse.json(
       { ok: false, error: 'Internal server error' },

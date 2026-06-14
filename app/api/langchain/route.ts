@@ -2,21 +2,13 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { LangChainService } from '@/src/services/langchainService';
 import { validateApiKey } from '@/src/lib/auth';
-
-// CORS headers
-const corsHeaders = {
-  'Access-Control-Allow-Origin': process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-};
-
-// Handle preflight requests
-export async function OPTIONS() {
-  return NextResponse.json({}, { headers: corsHeaders });
-}
+import { getCorsHeaders, validateRequestSize } from '@/src/lib/cors';
+import { sanitizeError } from '@/src/lib/validation';
 
 // GET - Health check and model status
 export async function GET(req: NextRequest) {
+  const corsHeaders = getCorsHeaders(req);
+  
   try {
     const { valid } = validateApiKey(req);
     if (!valid) {
@@ -36,7 +28,7 @@ export async function GET(req: NextRequest) {
       { headers: corsHeaders }
     );
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    const message = sanitizeError(err);
     return NextResponse.json(
       { ok: false, error: message },
       { status: 500, headers: corsHeaders }
@@ -52,7 +44,18 @@ interface LangChainRequestBody {
 
 // POST - Invoke LangChain model
 export async function POST(req: NextRequest) {
+  const corsHeaders = getCorsHeaders(req);
+  
   try {
+    // Validate request size
+    const contentLength = req.headers.get('content-length');
+    if (!validateRequestSize(contentLength, 1048576)) {
+      return NextResponse.json(
+        { ok: false, error: 'Request body too large' },
+        { status: 413, headers: corsHeaders }
+      );
+    }
+
     const { valid } = validateApiKey(req);
     if (!valid) {
       return NextResponse.json(
@@ -101,10 +104,14 @@ export async function POST(req: NextRequest) {
       { headers: corsHeaders }
     );
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    const message = sanitizeError(err);
     return NextResponse.json(
       { ok: false, error: message },
       { status: 500, headers: corsHeaders }
     );
   }
+}
+
+export async function OPTIONS(req: NextRequest) {
+  return NextResponse.json({}, { headers: getCorsHeaders(req) });
 }
