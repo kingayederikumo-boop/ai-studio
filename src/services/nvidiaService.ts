@@ -16,19 +16,20 @@ const NVIDIA_API_KEYS = [
   process.env.NVIDIA_API_KEY_2,
   process.env.NVIDIA_API_KEY_3,
   process.env.NVIDIA_API_KEY_4,
+  process.env.NVIDIA_API_KEY_5,
 ].filter(Boolean) as string[];
 
 // Models can be provided as a comma-separated env var mapped to keys, or left blank.
 const NVIDIA_MODELS_ENV = process.env.NVIDIA_MODELS || "";
 const NVIDIA_MODELS = NVIDIA_MODELS_ENV.split(",").map((s) => s.trim()).filter(Boolean);
-const DEFAULT_INFERENCE_MODEL = process.env.NVIDIA_INFERENCE_MODEL || "meta/llama-2-70b-chat";
+const DEFAULT_INFERENCE_MODEL = process.env.NVIDIA_INFERENCE_MODEL || "Nvidia/nemotron-3-ultra-550b-a55b";
 
 // Default candidate models to try when no explicit mapping is provided
 const DEFAULT_MODEL_CANDIDATES = [
-  "meta/llama-2-70b-chat",
-  "meta/llama-2-13b-chat",
-  "meta/llama-2-7b-chat",
-  "meta/llama-2-3b-chat",
+  "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
+  "qwen/qwen2.5-coder-32b-instruct",
+  "deepseek-ai/deepseek-v4-pro",
+  "moonshotai/kimi-k2.6",
 ];
 
 const NVIDIA_API_BASE = "https://integrate.api.nvidia.com/v1";
