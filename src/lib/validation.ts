@@ -69,3 +69,16 @@ export function sanitizeError(err: any): string {
     .replace(/secret[:\s=]+[^\s]+/gi, 'secret=[REDACTED]')
     .replace(/authorization[:\s=]+[^\s]+/gi, 'authorization=[REDACTED]');
 }
+
+/**
+ * Redact an API key, showing only the first 8 and last 4 characters
+ */
+export function redactApiKey(apiKey: string): string {
+  if (!apiKey || apiKey.length < 12) {
+    return '[REDACTED]';
+  }
+  const firstPart = apiKey.slice(0, 8);
+  const lastPart = apiKey.slice(-4);
+  const redactedLength = apiKey.length - 12;
+  return `${firstPart}${'*'.repeat(redactedLength)}${lastPart}`;
+}
