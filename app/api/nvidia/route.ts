@@ -24,23 +24,26 @@ export async function POST(req: NextRequest) {
     // 1. Initialize all your models by reading the keys from Vercel env vars
     const model1 = new ChatNVIDIA({ 
       apiKey: process.env.NVIDIA_API_KEY_1,
-      model: "meta/llama-3.1-8b-instruct" // Replace with your specific model ID
+      model: "nvidia/nemotron-3-ultra-550b-a55b
+"
     });
     const model2 = new ChatNVIDIA({ 
       apiKey: process.env.NVIDIA_API_KEY_2,
-      model: "your-second-model-id"
+      model: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning 
+"
     });
     const model3 = new ChatNVIDIA({ 
       apiKey: process.env.NVIDIA_API_KEY_3,
-      model: "your-third-model-id"
+      model: "qwen/qwen2.5-coder-32b-instruct
+"
     });
     const model4 = new ChatNVIDIA({ 
       apiKey: process.env.NVIDIA_API_KEY_4,
-      model: "your-fourth-model-id"
+      model: "deepseek-ai/deepseek-v4-pro"
     });
     const model5 = new ChatNVIDIA({ 
       apiKey: process.env.NVIDIA_API_KEY_5,
-      model: "your-fifth-model-id"
+      model: "moonshotai/kimi-k2.6"
     });
 
     const router = new RoundRobinRouter([model1, model2, model3, model4, model5]);
