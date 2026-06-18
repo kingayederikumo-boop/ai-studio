@@ -24,18 +24,15 @@ export async function POST(req: NextRequest) {
     // 1. Initialize all your models by reading the keys from Vercel env vars
     const model1 = new ChatNVIDIA({ 
       apiKey: process.env.NVIDIA_API_KEY_1,
-      model: "nvidia/nemotron-3-ultra-550b-a55b
-"
+      model: "nvidia/nemotron-3-ultra-550b-a55b"
     });
     const model2 = new ChatNVIDIA({ 
       apiKey: process.env.NVIDIA_API_KEY_2,
-      model: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning 
-"
+      model: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning" 
     });
     const model3 = new ChatNVIDIA({ 
       apiKey: process.env.NVIDIA_API_KEY_3,
-      model: "qwen/qwen2.5-coder-32b-instruct
-"
+      model: "qwen/qwen2.5-coder-32b-instruct" 
     });
     const model4 = new ChatNVIDIA({ 
       apiKey: process.env.NVIDIA_API_KEY_4,
