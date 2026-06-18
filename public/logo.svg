@@ -14,7 +14,7 @@
   <path d="M 300 750 L 500 250 L 700 750 Z" fill="none" stroke="url(#gradA)" stroke-width="80" stroke-linejoin="round"/>
   <line x1="380" y1="550" x2="620" y2="550" stroke="url(#gradA)" stroke-width="80" stroke-linecap="round"/>
   
-  <!-- "5" shape with rounded elements -->
+  <!-- "S" shape with rounded elements -->
   <g>
     <!-- Top horizontal bar -->
     <line x1="750" y1="280" x2="880" y2="280" stroke="url(#gradB)" stroke-width="80" stroke-linecap="round"/>
