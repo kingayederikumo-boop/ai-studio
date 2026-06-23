@@ -1,0 +1,1 @@
+export function ChatPanel(){return <div className='p-4'><h2 className='font-semibold mb-2'>AI Chat</h2><div className='text-sm text-zinc-400'>Workspace assistant will appear here.</div></div>}
