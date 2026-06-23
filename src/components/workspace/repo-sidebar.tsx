@@ -1,0 +1,1 @@
+export function RepoSidebar(){const repos=['ai-studio','Zarva','Ava_ID'];return <aside className='p-4'><h2 className='font-semibold mb-2'>Repositories</h2><ul>{repos.map(r=><li key={r} className='py-1'>{r}</li>)}</ul></aside>}
