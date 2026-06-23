@@ -1,0 +1,1 @@
+export function WorkspaceHeader(){return <header className='border-b border-zinc-800 p-4'><h1 className='text-xl font-bold'>AI Studio Workspace</h1></header>}
