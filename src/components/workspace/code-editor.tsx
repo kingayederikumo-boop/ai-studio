@@ -1,0 +1,1 @@
+export function CodeEditor(){return <div className='p-4'><h2 className='font-semibold mb-2'>Code Editor</h2><pre className='text-xs'>Select a file to begin editing.</pre></div>}
