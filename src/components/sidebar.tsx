@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Icon } from "./sidebar-icons";
 import type { IconName } from "./sidebar-icons";
+import { useChat } from "@/src/state/chat-context";
 
 const items: Array<{ name: string; href: string; icon: IconName }> = [
   { name: "Chat", href: "/chat", icon: "MessageSquare" },
@@ -14,6 +15,8 @@ const items: Array<{ name: string; href: string; icon: IconName }> = [
 
 export function Sidebar() {
   const pathname = usePathname() || "/";
+  const { recentSessions, loadSession } = useChat();
+  const [showHistory, setShowHistory] = useState(false);
 
   return (
     <aside className="hidden md:flex w-64 flex-col border-r border-zinc-800 bg-zinc-900/50 backdrop-blur">
@@ -96,6 +99,29 @@ export function Sidebar() {
             );
           })}
         </ul>
+
+        {/* Recent Chats */}
+        <div className="mt-8">
+          <div className="flex items-center justify-between px-4 mb-3">
+            <span className="text-xs uppercase tracking-widest text-zinc-500">Recent Chats</span>
+            <button onClick={() => setShowHistory(!showHistory)} className="text-zinc-400 hover:text-white text-xs">
+              {showHistory ? 'Hide' : 'Show'}
+            </button>
+          </div>
+          {showHistory && recentSessions.length > 0 && (
+            <div className="space-y-1 max-h-64 overflow-y-auto">
+              {recentSessions.slice(0, 5).map((session) => (
+                <button
+                  key={session.id}
+                  onClick={() => loadSession(session.id)}
+                  className="w-full text-left px-4 py-2 text-sm text-zinc-400 hover:bg-zinc-800/50 hover:text-white rounded-xl truncate"
+                >
+                  {session.title || 'New Chat'}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </nav>
     </aside>
   );
