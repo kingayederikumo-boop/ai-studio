@@ -9,6 +9,7 @@ export const metadata: Metadata = {
     icon: "/logo.svg",
     apple: "/logo.svg",
   },
+  manifest: "/manifest.json",
 };
 
 export default function RootLayout({
@@ -17,7 +18,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="h-full antialiased">
+    <html lang="en" className="h-full antialiased dark">
       <head>
         <link rel="icon" href="/logo.svg" type="image/svg+xml" />
       </head>
