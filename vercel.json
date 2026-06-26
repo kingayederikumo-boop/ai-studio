@@ -1,0 +1,6 @@
+{
+  "env": {
+    "OPENAI_API_KEY": "@openai-api-key",
+    "GITHUB_TOKEN": "@github-token"
+  }
+}
