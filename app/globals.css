@@ -1,4 +1,21 @@
-/* Updated with AI Studio gradient */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 :root {
-  --primary: linear-gradient(135deg, #00d9ff 0%, #a020f0 100%);
+  --background: #0a0a0a;
+  --foreground: #ededed;
+  --primary: #7c3aed;
+  --primary-gradient: linear-gradient(135deg, #00d9ff 0%, #a020f0 100%);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.gradient-logo {
+  background: var(--primary-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
