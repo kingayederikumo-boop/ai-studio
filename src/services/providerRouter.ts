@@ -1,9 +1,6 @@
-import type { Settings } from "@/src/types/index";
-import { OpenAIService } from "./openaiService";
 import { NvidiaService } from "./nvidiaService";
-import { MemoryService } from "./memoryService";
 
-export type ProviderType = "openai" | "nvidia";
+export type ProviderType = "nvidia";
 
 export interface ProviderResponse {
   ok: boolean;
@@ -13,83 +10,15 @@ export interface ProviderResponse {
 }
 
 export const ProviderRouter = {
-  selectArchitecture(settings: Settings): ProviderType {
-    if (settings.architectureProvider === "Nvidia") return "nvidia";
-    return "openai";
-  },
-
-  selectCoding(settings: Settings): ProviderType {
-    if (settings.codingProvider === "Nvidia") return "nvidia";
-    return "openai";
-  },
-
-  async generateText(
-    prompt: string,
-    provider: ProviderType
-  ): Promise<ProviderResponse> {
-    try {
-      if (provider === "nvidia") {
-        const result = await NvidiaService.inference(prompt);
-        if (!result.ok) {
-          return { ok: false, error: result.error, provider: "nvidia" };
-        }
-        return {
-          ok: true,
-          text: result.payload?.text,
-          provider: "nvidia",
-        };
-      } else {
-        const result = await OpenAIService.generateText(prompt);
-        if (!result.ok) {
-          // If OpenAI returns a quota error (429) or a message indicating quota, try Nvidia fallback
-          const err = result.error || "";
-          if (err.toLowerCase().includes("quota") || err.includes("429")) {
-            const n = await NvidiaService.inference(prompt);
-            if (n.ok) return { ok: true, text: n.payload?.text, provider: "nvidia" };
-            return { ok: false, error: `OpenAI quota exceeded and Nvidia fallback failed: ${n.error}`, provider: "nvidia" };
-          }
-
-          return { ok: false, error: result.error, provider: "openai" };
-        }
-        return {
-          ok: true,
-          text: result.payload?.text,
-          provider: "openai",
-        };
-      }
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      return { ok: false, error: `Provider error: ${errorMessage}` };
+  async generateText(prompt: string): Promise<ProviderResponse> {
+    const result = await NvidiaService.inference(prompt);
+    if (!result.ok) {
+      return { ok: false, error: result.error, provider: "nvidia" };
     }
-  },
-
-  async generateTextWithMemory(
-    prompt: string,
-    provider: ProviderType,
-    sessionId: string
-  ): Promise<ProviderResponse> {
-    try {
-      // Add prompt to session memory
-      MemoryService.addToSession(sessionId, prompt, "user");
-
-      // Generate response using the selected provider
-      const result = await this.generateText(prompt, provider);
-
-      if (result.ok && result.text) {
-        // Store assistant response in memory
-        MemoryService.addToSession(sessionId, result.text, "assistant");
-      }
-
-      return result;
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      return { ok: false, error: `Memory-based generation error: ${errorMessage}` };
-    }
-  },
-
-  getSessionMemoryStatus(sessionId: string): object {
-    return MemoryService.getSessionStatus(sessionId);
+    return {
+      ok: true,
+      text: result.payload?.text,
+      provider: "nvidia",
+    };
   },
 };

@@ -3,29 +3,18 @@ import { ProviderRouter } from '@/src/services/providerRouter';
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { prompt, provider: requestedProvider } = body;
-    
+    const { prompt } = await req.json();
     if (!prompt?.trim()) {
       return NextResponse.json({ ok: false, error: 'Prompt is required' }, { status: 400 });
     }
-
-    const provider = requestedProvider || 'nvidia';
-    const result = await ProviderRouter.generateText(prompt.trim(), provider as any);
-
+    const result = await ProviderRouter.generateText(prompt.trim());
     if (!result.ok) {
-      console.error('[Chat API] Provider error:', result.error);
-      return NextResponse.json({ ok: false, error: result.error || 'Unknown provider error' }, { status: 500 });
+      console.error('[Chat API]', result.error);
+      return NextResponse.json({ ok: false, error: result.error }, { status: 500 });
     }
-
-    return NextResponse.json({ 
-      ok: true, 
-      text: result.text,
-      provider: result.provider 
-    });
+    return NextResponse.json({ ok: true, text: result.text });
   } catch (error) {
     console.error('[Chat API Error]', error);
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    return NextResponse.json({ ok: false, error: message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 });
   }
 }
