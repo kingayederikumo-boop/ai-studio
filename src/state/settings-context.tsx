@@ -1,48 +1,16 @@
 "use client";
+import React, { createContext, useContext, useState } from "react";
 
-import React, { createContext, useContext, useEffect, useState } from "react";
-import type { Settings } from "@/src/types";
-import { SettingsService } from "@/src/services/settingsService";
+export interface Settings {
+  architectureProvider: 'Nvidia' | 'OpenAI';
+}
 
-type SettingsContextType = {
-  settings: Settings;
-  setSettings: (s: Settings) => void;
-};
-
-const defaultSettings: Settings = {
-  architectureProvider: "OpenAI",
-  codingProvider: "Nvidia",
-};
-
-const SettingsContext = createContext<SettingsContextType | undefined>(
-  undefined
-);
+const defaultSettings: Settings = { architectureProvider: 'Nvidia' };
 
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
-  const [settings, setSettingsState] = useState<Settings>(defaultSettings);
-
-  useEffect(() => {
-    const loaded = SettingsService.load();
-    if (loaded) setSettingsState(loaded);
-  }, []);
-
-  useEffect(() => {
-    SettingsService.save(settings);
-  }, [settings]);
-
-  function setSettings(s: Settings) {
-    setSettingsState(s);
-  }
-
-  return (
-    <SettingsContext.Provider value={{ settings, setSettings }}>
-      {children}
-    </SettingsContext.Provider>
-  );
+  const [settings] = useState(defaultSettings);
+  return <SettingsContext.Provider value={{ settings }}>{children}</SettingsContext.Provider>;
 }
 
-export function useSettings() {
-  const ctx = useContext(SettingsContext);
-  if (!ctx) throw new Error("useSettings must be used within SettingsProvider");
-  return ctx;
-}
+const SettingsContext = createContext({ settings: defaultSettings });
+export const useSettings = () => useContext(SettingsContext);
