@@ -3,7 +3,8 @@ import { ProviderRouter } from '@/src/services/providerRouter';
 
 export async function POST(req: NextRequest) {
   try {
-    const { prompt, provider: requestedProvider } = await req.json();
+    const body = await req.json();
+    const { prompt, provider: requestedProvider } = body;
     
     if (!prompt?.trim()) {
       return NextResponse.json({ ok: false, error: 'Prompt is required' }, { status: 400 });
@@ -13,6 +14,7 @@ export async function POST(req: NextRequest) {
     const result = await ProviderRouter.generateText(prompt.trim(), provider as any);
 
     if (!result.ok) {
+      console.error('[Chat API] Provider error:', result.error);
       return NextResponse.json({ ok: false, error: result.error || 'Unknown provider error' }, { status: 500 });
     }
 
