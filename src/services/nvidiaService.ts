@@ -10,202 +10,46 @@ export interface NvidiaInferencePayload {
   text: string;
 }
 
-// Nvidia API Keys from environment
-const NVIDIA_API_KEYS = [
-  process.env.NVIDIA_API_KEY_1,
-  process.env.NVIDIA_API_KEY_2,
-  process.env.NVIDIA_API_KEY_3,
-  process.env.NVIDIA_API_KEY_4,
-  process.env.NVIDIA_API_KEY_5,
-].filter(Boolean) as string[];
-
-// Models can be provided as a comma-separated env var mapped to keys, or left blank.
-const NVIDIA_MODELS_ENV = process.env.NVIDIA_MODELS || "";
-const NVIDIA_MODELS = NVIDIA_MODELS_ENV.split(",").map((s) => s.trim()).filter(Boolean);
-const DEFAULT_INFERENCE_MODEL = process.env.NVIDIA_INFERENCE_MODEL || "Nvidia/nemotron-3-ultra-550b-a55b";
-
-// Default candidate models to try when no explicit mapping is provided
-const DEFAULT_MODEL_CANDIDATES = [
-  "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
-  "qwen/qwen2.5-coder-32b-instruct",
-  "deepseek-ai/deepseek-v4-pro",
-  "moonshotai/kimi-k2.6",
-];
+const NVIDIA_API_KEYS = [process.env.NVIDIA_API_KEY, process.env.NVIDIA_API_KEY_1].filter(Boolean) as string[];
 
 const NVIDIA_API_BASE = "https://integrate.api.nvidia.com/v1";
+const DEFAULT_MODEL = process.env.NVIDIA_INFERENCE_MODEL || "nvidia/nemotron-3-ultra-550b-a55b";
 
-interface NvidiaKeyRotation {
-  currentIndex: number;
-  lastError?: string | null;
-}
-
-const keyRotation: NvidiaKeyRotation = {
-  currentIndex: 0,
-  lastError: null,
-};
-
-function getCurrentKey(): string | null {
-  if (NVIDIA_API_KEYS.length === 0) return null;
-  return NVIDIA_API_KEYS[keyRotation.currentIndex];
-}
-
-export function setCurrentKeyIndex(index: number) {
-  if (NVIDIA_API_KEYS.length === 0) return null;
-  if (index < 0 || index >= NVIDIA_API_KEYS.length) return null;
-  keyRotation.currentIndex = index;
-  return keyRotation.currentIndex;
-}
-
-function getModelCandidatesForKey(index: number): string[] {
-  // If NVIDIA_MODELS has the same length as keys, each key has its own mapped model (single)
-  if (NVIDIA_MODELS.length === NVIDIA_API_KEYS.length) {
-    const model = NVIDIA_MODELS[index] || DEFAULT_INFERENCE_MODEL;
-    return [model];
-  }
-  // If a list of models provided but does not match keys, try that list first
-  if (NVIDIA_MODELS.length > 0) return NVIDIA_MODELS;
-  // Default candidate list
-  return DEFAULT_MODEL_CANDIDATES;
-}
-
-function rotateToNextKey(): string | null {
-  if (NVIDIA_API_KEYS.length === 0) return null;
-  keyRotation.currentIndex = (keyRotation.currentIndex + 1) % NVIDIA_API_KEYS.length;
-  return NVIDIA_API_KEYS[keyRotation.currentIndex];
-}
-
-function isModelNotFoundError(err: any): boolean {
-  const msg = err instanceof Error ? err.message : String(err);
-  return /model not found|does not exist|404/.test(msg.toLowerCase());
-}
-
-async function tryModelWithKey(prompt: string, key: string, model: string): Promise<{ ok: boolean; text?: string; error?: string; status?: number }> {
-  try {
-    const response = await axios.post(
-      `${NVIDIA_API_BASE}/chat/completions`,
-      {
-        model,
-        messages: [
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
-        temperature: 0.7,
-        top_p: 0.7,
-        max_tokens: 1024,
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${key}`,
-          "Content-Type": "application/json",
-        },
-        timeout: 30000,
-      }
-    );
-
-    const text = response.data?.choices?.[0]?.message?.content || "";
-    return { ok: true, text };
-  } catch (error) {
-    const lastError =
-      error instanceof AxiosError
-        ? (error.response?.data?.error?.message as string) || error.message || "Unknown error"
-        : error instanceof Error
-        ? error.message
-        : String(error);
-    const status = error instanceof AxiosError ? error.response?.status : undefined;
-    // Annotate 404 errors so callers can provide better guidance
-    if (status === 404) {
-      return { ok: false, error: `Nvidia API returned 404 for model/endpoint: ${model}. ${lastError}`, status };
-    }
-    return { ok: false, error: lastError, status };
-  }
-}
-
-async function inferenceWithRetry(
-  prompt: string
-): Promise<NvidiaResponse<NvidiaInferencePayload>> {
+async function inferenceWithRetry(prompt: string): Promise<NvidiaResponse<NvidiaInferencePayload>> {
   if (NVIDIA_API_KEYS.length === 0) {
-    return { ok: false, error: "Nvidia API keys not configured" };
+    return { ok: false, error: "NVIDIA_API_KEY not configured. Check Vercel environment variables." };
   }
 
-  let lastError: string | null = null;
-  const maxAttempts = NVIDIA_API_KEYS.length;
-  // Track whether every attempt resulted in a 404 (endpoint/model not found)
-  let allAttemptsWere404 = true;
+  // Try keys in rotation
+  for (const key of NVIDIA_API_KEYS) {
+    try {
+      const response = await axios.post(
+        `${NVIDIA_API_BASE}/chat/completions`,
+        {
+          model: DEFAULT_MODEL,
+          messages: [{ role: "user", content: prompt }],
+          temperature: 0.7,
+          max_tokens: 1024,
+        },
+        {
+          headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+          timeout: 45000,
+        }
+      );
 
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const key = getCurrentKey();
-    if (!key) {
-      return {
-        ok: false,
-        error: "No valid Nvidia API keys available",
-      };
-    }
-
-    const modelCandidates = getModelCandidatesForKey(keyRotation.currentIndex);
-
-    for (const model of modelCandidates) {
-      const res = await tryModelWithKey(prompt, key, model);
-      if (res.ok) {
-        // success
-        return { ok: true, payload: { text: res.text || "" } };
-      }
-
-      // record last error
-      lastError = res.error || lastError;
-
-      // If model not found (404) for this model, try next model candidate with the same key
-      if (res.status === 404 || isModelNotFoundError(res.error)) {
-        // this attempt was a 404; keep allAttemptsWere404 true unless we see a non-404 later
-        continue;
-      }
-
-      // Mark that we saw a non-404 error (so not all attempts are 404)
-      allAttemptsWere404 = false;
-
-      // For other errors, try next model candidate first; if exhausted, rotate to next key
-      // continue to next candidate
-    }
-
-    // After trying all candidates for this key, rotate to the next key and try again
-    keyRotation.lastError = lastError;
-    if (attempt < maxAttempts - 1) {
-      rotateToNextKey();
+      const text = response.data?.choices?.[0]?.message?.content || "";
+      return { ok: true, payload: { text } };
+    } catch (error) {
+      const msg = error instanceof AxiosError ? (error.response?.data?.error?.message || error.message) : String(error);
+      console.error(`[NVIDIA Key Error]`, msg);
+      // Continue to next key
     }
   }
-
-  // If every request returned 404, return a specific actionable error to help debugging
-  if (allAttemptsWere404) {
-    return {
-      ok: false,
-      error:
-        `Nvidia API returned 404 for all tried models/endpoints. This usually means the configured NVIDIA_API_BASE, model names, or API keys are incorrect or not authorized. ` +
-        `Check your NVIDIA_API_BASE, ensure the endpoint exists, verify model names (NVIDIA_MODELS / NVIDIA_INFERENCE_MODEL), and confirm the API key(s) have access. Last error: ${lastError}`,
-    };
-  }
-
-  return {
-    ok: false,
-    error: `Nvidia API error after retries: ${lastError}`,
-  };
+  return { ok: false, error: "All NVIDIA keys failed. Verify keys in Vercel and model access." };
 }
 
 export const NvidiaService = {
-  async inference(
-    prompt: string
-  ): Promise<NvidiaResponse<NvidiaInferencePayload>> {
+  async inference(prompt: string): Promise<NvidiaResponse<NvidiaInferencePayload>> {
     return inferenceWithRetry(prompt);
   },
-
-  getKeyRotationStatus() {
-    return {
-      currentKeyIndex: keyRotation.currentIndex,
-      totalKeys: NVIDIA_API_KEYS.length,
-      lastError: keyRotation.lastError,
-      models: NVIDIA_MODELS.length > 0 ? NVIDIA_MODELS : DEFAULT_MODEL_CANDIDATES,
-    };
-  },
-
-  setCurrentKeyIndex,
 };
