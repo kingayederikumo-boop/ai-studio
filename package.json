@@ -1,12 +1,12 @@
 {
-  "name": "nextjs",
+  "name": "ai-studio",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint . --ext .ts,.tsx"
   },
   "dependencies": {
     "next": "15.5.18",
@@ -15,11 +15,7 @@
     "tailwindcss": "^3.4.8",
     "postcss": "^8.4.21",
     "autoprefixer": "^10.4.14",
-    "openai": "^4.52.0",
     "axios": "^1.16.0",
-    "@langchain/core": "^0.3.0",
-    "@langchain/openai": "^0.0.30",
-    "langchain": "^0.3.0",
     "@supabase/supabase-js": "^2.38.0",
     "redis": "^4.6.0"
   },
