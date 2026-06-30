@@ -3,10 +3,10 @@
 @tailwind utilities;
 
 :root {
-  --background: #0a0a0a;
+  --background: #0a0a0a;     /* dark bg */
   --foreground: #ededed;
-  --primary: #7c3aed;
-  --primary-gradient: linear-gradient(135deg, #00d9ff 0%, #a020f0 100%);
+  --primary: #00ff9f;        /* your new accent */
+  --primary-gradient: linear-gradient(135deg, #00ff9f 0%, #00b8ff 100%);
 }
 
 body {
