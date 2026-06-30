@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "@/src/styles/globals.css";
 import AppShell from "@/src/components/AppShell";
+import { ChatProvider } from "@/src/state/chat-context";
 
 export const metadata: Metadata = {
   title: "AI Studio",
@@ -23,7 +24,9 @@ export default function RootLayout({
         <link rel="icon" href="/logo.svg" type="image/svg+xml" />
       </head>
       <body className="min-h-full flex flex-col">
-        <AppShell>{children}</AppShell>
+        <ChatProvider>
+          <AppShell>{children}</AppShell>
+        </ChatProvider>
       </body>
     </html>
   );
