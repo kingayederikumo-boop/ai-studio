@@ -1,5 +1,1 @@
-export const OpenAIService = {
-  async generateText(prompt: string) {
-    return { ok: false, error: 'OpenAI stub - configure key' };
-  }
-};
+// Removed - NVIDIA focus only. Dead code cleaned.
